@@ -68,22 +68,22 @@ local CustomMusic = {
         "84568605632436", "89325288821756", "91253824604131", "93310151880263", "93519960802493", 
         "93904884639656", "94403836240383", "95342421407401", "98053641267248", "100375711235188", 
         "102572315485834", "99898461569597", "74357981764138", "137982664156085", "130081842972719", 
-        "104048341641021", "121362946861937", "138765729162919", "78954682326720", "123347059891006", 
-        "140380438039459", "79999089664644", "99960601736776", "71901178173441", "78596441510872", 
-        "109722402543891", "132820291139725", "119254319180287", "132049153370517", "84632466431875", 
-        "124327505221192", "126380171075625", "86987612038693", "98523490642599", "135473905127296", 
-        "86524582645901", "125902207303673", "109192549525612", "83648751451059", "100451507679706", 
-        "72480594505111", "71406622961211", "132269954228136", "107571001738028", "110492925502767", 
-        "72240516659471", "87027533709895", "114056884370316", "134041350719923", "129094836473103", 
-        "96972693020663", "101326386144997", "98360514812928", "123756660035621", "105764391490058", 
-        "99555946575863", "83822846210154", "98057205717847", "97905521003178", "114822024415562", 
-        "139364859035367", "109213747545807", "104049068783505", "117956197901108", "131783691173299", 
-        "124421941339472", "138880701865676", "78824616143993", "75715979100227", "107311211041183", 
-        "106494245379390", "83739340628456", "128686634439921", "81293169027034", "117980812942988", 
-        "94466059598423", "128407285672851", "135033376729441", "117573020828597", "112409903835101", 
-        "120774312900609", "106672241567740", "123987566373062", "102068629587339", "138432087292357", 
-        "124963397709797", "127357308077942", "120982716207340", "107782812721355", "80302234019139", 
-        "89325251642828", "127356451659099", "70433420449192", "118088133904805", "140356555214455", 
+        "104048341641021", "121362946861937", "138765729162919", "78954682326720", "123347059891006",
+        "140380438039459", "79999089664644", "99960601736776", "71901178173441", "78596441510872",
+        "109722402543891", "132820291139725", "119254319180287", "132049153370517", "84632466431875",
+        "124327505221192", "126380171075625", "86987612038693", "98523490642599", "135473905127296",
+        "86524582645901", "125902207303673", "109192549525612", "83648751451059", "100451507679706",
+        "72480594505111", "71406622961211", "132269954228136", "107571001738028", "110492925502767",
+        "72240516659471", "87027533709895", "114056884370316", "134041350719923", "129094836473103",
+        "96972693020663", "101326386144997", "98360514812928", "123756660035621", "105764391490058",
+        "99555946575863", "83822846210154", "98057205717847", "97905521003178", "114822024415562",
+        "139364859035367", "109213747545807", "104049068783505", "117956197901108", "131783691173299",
+        "124421941339472", "138880701865676", "78824616143993", "75715979100227", "107311211041183",
+        "106494245379390", "83739340628456", "128686634439921", "81293169027034", "117980812942988",
+        "94466059598423", "128407285672851", "135033376729441", "117573020828597", "112409903835101",
+        "120774312900609", "106672241567740", "123987566373062", "102068629587339", "138432087292357",
+        "124963397709797", "127357308077942", "120982716207340", "107782812721355", "80302234019139",
+        "89325251642828", "127356451659099", "70433420449192", "118088133904805", "140356555214455",
         "105550270347327", "130068145051017", "134923975257040", "96972810010931", "102756798305993",
         "77209823972345", "117692545421731", "127562038902452", "114252241329278", "131307405424060",
         "79223002246133", "123788717693181", "83505962483621", "122612196073218", "92618480059087",
@@ -440,7 +440,7 @@ BackCatBtn.MouseButton1Click:Connect(function()
     MusicFrame.Visible = true
 end)
 
--- ฟังก์ชันสร้างไอเทมปุ่มเลือกหมวดหมู่เพลง
+-- ฟังก์ชันเปิดเมนูหมวดหมู่เพลง
 local isMenuOpen = false
 MenuBtn.MouseButton1Click:Connect(function()
     isMenuOpen = not isMenuOpen
@@ -458,8 +458,19 @@ MenuBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+-- สร้างช่องกรอกข้อมูล Audio ID บนหน้าควบคุมหลัก (Main panel)
+IDInput = Instance.new("TextBox", MainFrame)
+IDInput.Size = UDim2.new(0.85, 0, 0, 35)
+IDInput.Position = UDim2.new(0.075, 0, 0.25, 0)
+IDInput.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
+IDInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+IDInput.PlaceholderText = "Enter Audio ID..."
+IDInput.Text = ""
+IDInput.Font = Enum.Font.SpecialElite
+IDInput.TextSize = 14
+Instance.new("UICorner", IDInput)
+
 -- ฟังก์ชันดึงชื่อเพลงและอัปเดตลงหน้าควบคุมหลักเมื่อคลิกเลือกใช้งาน
-local IDInput -- ประกาศล่วงหน้าเพื่อเรียกใช้ในฟังก์ชันข้อมูลเพลง
 local function loadSongToMainRemote(audioId)
     if IDInput then
         IDInput.Text = tostring(audioId)
@@ -788,199 +799,48 @@ task.spawn(function()
         end
     end
     game.Workspace.DescendantAdded:Connect(checkSound)
+    for _, des in pairs(game.Workspace:GetDescendants()) do checkSound(des) end
 end)
 
--- --- [ PRE-EXISTING UI ELEMENTS (คงเดิมและเชื่อมต่อตามปกติ) ] ---
-local AlbumCover = Instance.new("ImageLabel", MainFrame)
-AlbumCover.Size = UDim2.new(0, 65, 0, 65)
-AlbumCover.Position = UDim2.new(0.5, -32, 0, 40)
-AlbumCover.BackgroundColor3 = Color3.fromRGB(22, 0, 0)
-AlbumCover.BorderSizePixel = 0
-AlbumCover.Image = "rbxassetid://0"
-Instance.new("UICorner", AlbumCover).CornerRadius = UDim.new(0, 6)
-
-local CoverStroke = Instance.new("UIStroke", AlbumCover)
-CoverStroke.Color = Color3.fromRGB(60, 0, 0)
-CoverStroke.Thickness = 1
-
-local TrackNameLabel = Instance.new("TextLabel", MainFrame)
-TrackNameLabel.Size = UDim2.new(0.85, 0, 0, 20)
-TrackNameLabel.Position = UDim2.new(0.075, 0, 0, 110)
-TrackNameLabel.BackgroundTransparency = 1
-TrackNameLabel.Text = "NO SONG LOADED"
-TrackNameLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-TrackNameLabel.Font = Enum.Font.SourceSansItalic
-TrackNameLabel.TextSize = 12
-TrackNameLabel.TextTruncate = Enum.TextTruncate.AtEnd
-
-IDInput = Instance.new("TextBox", MainFrame)
-IDInput.Size = UDim2.new(0.85, 0, 0, 35)
-IDInput.Position = UDim2.new(0.075, 0, 0, 140)
-IDInput.BackgroundColor3 = Color3.fromRGB(22, 0, 0)
-IDInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-IDInput.PlaceholderText = "ENTER AUDIO ID..."
-IDInput.PlaceholderColor3 = Color3.fromRGB(120, 40, 40)
-IDInput.Text = ""
-IDInput.Font = Enum.Font.SpecialElite
-IDInput.TextSize = 13
-IDInput.BorderSizePixel = 0
-Instance.new("UICorner", IDInput).CornerRadius = UDim.new(0, 6)
-
-local InputStroke = Instance.new("UIStroke", IDInput)
-InputStroke.Color = Color3.fromRGB(60, 0, 0)
-InputStroke.Thickness = 1.2
-
-IDInput.Focused:Connect(function()
-    TweenService:Create(InputStroke, TweenInfo.new(0.2), {Color = Color3.fromRGB(255, 0, 0)}):Play()
-end)
-IDInput.FocusLost:Connect(function()
-    TweenService:Create(InputStroke, TweenInfo.new(0.2), {Color = Color3.fromRGB(60, 0, 0)}):Play()
-end)
-
-IDInput:GetPropertyChangedSignal("Text"):Connect(function()
-    local cleanId = IDInput.Text:match("%d+")
-    if cleanId and #cleanId > 0 then
-        AlbumCover.Image = "https://www.roblox.com/asset-thumbnail/image?assetId=" .. cleanId .. "&width=150&height=150&format=png"
-        TweenService:Create(CoverStroke, TweenInfo.new(0.3), {Color = Color3.fromRGB(255, 0, 0)}):Play()
-        task.spawn(function()
-            local success, info = pcall(function() return MarketplaceService:GetProductInfo(tonumber(cleanId)) end)
-            if success and info and info.AssetTypeId == 3 then
-                TrackNameLabel.Text = string.upper(info.Name)
-                TrackNameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-            else
-                TrackNameLabel.Text = "UNKNOWN AUDIO / UNABLE TO LOAD"
-                TrackNameLabel.TextColor3 = Color3.fromRGB(150, 50, 50)
-            end
-        end)
-    else
-        AlbumCover.Image = "rbxassetid://0"
-        CoverStroke.Color = Color3.fromRGB(60, 0, 0)
-        TrackNameLabel.Text = "NO SONG LOADED"
-        TrackNameLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
-    end
-end)
-
-local ProgressBackground = Instance.new("Frame", MainFrame)
-ProgressBackground.Size = UDim2.new(0.85, 0, 0, 4)
-ProgressBackground.Position = UDim2.new(0.075, 0, 0, 190)
-ProgressBackground.BackgroundColor3 = Color3.fromRGB(35, 0, 0)
-ProgressBackground.BorderSizePixel = 0
-Instance.new("UICorner", ProgressBackground)
-
-local ProgressBar = Instance.new("Frame", ProgressBackground)
-ProgressBar.Size = UDim2.new(0, 0, 1, 0)
-ProgressBar.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-ProgressBar.BorderSizePixel = 0
-Instance.new("UICorner", ProgressBar)
-
-local TimeLabel = Instance.new("TextLabel", MainFrame)
-TimeLabel.Size = UDim2.new(0.85, 0, 0, 15)
-TimeLabel.Position = UDim2.new(0.075, 0, 0, 198)
-TimeLabel.BackgroundTransparency = 1
-TimeLabel.Text = "00:00 / 00:00"
-TimeLabel.TextColor3 = Color3.fromRGB(180, 50, 50)
-TimeLabel.Font = Enum.Font.Code
-TimeLabel.TextSize = 11
-TimeLabel.TextXAlignment = Enum.TextXAlignment.Right
-
+-- =========================================================
+-- [ 🚀 BUTTON & LOGIC: ปุ่มเปิดเพลง BYPASS REMOTE (ตัวสำคัญจากสคริปต์แรก) ]
+-- =========================================================
 local PlayBtn = Instance.new("TextButton", MainFrame)
-PlayBtn.Size = UDim2.new(0, 46, 0, 46)
-PlayBtn.Position = UDim2.new(0.5, -23, 0, 225)
-PlayBtn.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
-PlayBtn.Text = "▶"
+PlayBtn.Size = UDim2.new(0.85, 0, 0, 40)
+PlayBtn.Position = UDim2.new(0.075, 0, 0.55, 0)
+PlayBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
+PlayBtn.Text = "PLAY MUSIC"
 PlayBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-PlayBtn.Font = Enum.Font.GothamBold
-PlayBtn.TextSize = 15
-PlayBtn.BorderSizePixel = 0
-Instance.new("UICorner", PlayBtn).CornerRadius = UDim.new(1, 0)
+PlayBtn.Font = Enum.Font.SpecialElite
+PlayBtn.TextSize = 16
+Instance.new("UICorner", PlayBtn)
 
-local BtnStroke = Instance.new("UIStroke", PlayBtn)
-BtnStroke.Color = Color3.fromRGB(255, 0, 0)
-BtnStroke.Thickness = 1.2
-
-local currentTween = nil
-local timerConnection = nil
-
-local function formatTime(seconds)
-    local mins = math.floor(seconds / 60)
-    local secs = math.floor(seconds % 60)
-    return string.format("%02d:%02d", mins, secs)
-end
-
--- =========================================================
--- [ NEW ELEMENT: วงรีลายน้ำเครดิตด่านล่างสุดปรับโครงสร้างข้อความใหม่ ]
--- =========================================================
-local Watermark = Instance.new("TextLabel", MainFrame)
-Watermark.Size = UDim2.new(0, 140, 0, 18)
-Watermark.Position = UDim2.new(0.5, -70, 1, -22)
-Watermark.BackgroundColor3 = Color3.fromRGB(25, 0, 0)
-Watermark.Text = "@ก้อบปี้ไล SkyWord"
-Watermark.TextColor3 = Color3.fromRGB(180, 0, 0)
-Watermark.Font = Enum.Font.SpecialElite
-Watermark.TextSize = 10
-Instance.new("UICorner", Watermark).CornerRadius = UDim.new(1, 0)
-local WmStroke = Instance.new("UIStroke", Watermark)
-WmStroke.Color = Color3.fromRGB(60, 0, 0)
-WmStroke.Thickness = 1
-
-local isPlaying = false
-local currentDuration = 0
-
-local function stopVisualTimer()
-    if timerConnection then timerConnection:Disconnect(); timerConnection = nil end
-    if currentTween then currentTween:Cancel(); currentTween = nil end
-    ProgressBar.Size = UDim2.new(0, 0, 1, 0)
-    TimeLabel.Text = "00:00 / 00:00"
-    PlayBtn.Text = "▶"
-    isPlaying = false
-end
-
-local function startVisualTimer(duration)
-    stopVisualTimer()
-    isPlaying = true
-    currentDuration = duration
-    PlayBtn.Text = "||"
-    
-    ProgressBar.Size = UDim2.new(0, 0, 1, 0)
-    currentTween = TweenService:Create(ProgressBar, TweenInfo.new(duration, Enum.EasingStyle.Linear), {Size = UDim2.new(1, 0, 1, 0)})
-    currentTween:Play()
-    
-    local startTime = os.clock()
-    timerConnection = game:GetService("RunService").Heartbeat:Connect(function()
-        local elapsed = os.clock() - startTime
-        if elapsed >= duration then
-            stopVisualTimer()
-        else
-            TimeLabel.Text = formatTime(elapsed) .. " / " .. formatTime(duration)
-        end
-    end)
-end
-
-local function fireRemoteEvent(audioId)
-    local cleanId = tostring(audioId):match("%d+")
-    if not cleanId then return end
-    
-    local targetRemote = ReplicatedStorage:FindFirstChild(D[14])
-    if targetRemote and targetRemote:IsA("RemoteEvent") then
-        local packedData = encodeID(cleanId)
-        targetRemote:FireServer(D[15], packedData)
-    end
-end
-
+-- ทำงานเมื่อกดปุ่ม PLAY MUSIC (ดึงลอจิกยิง Remote ของเล่นเพลงบายพาสแบบ 1000 หลัก)
 PlayBtn.MouseButton1Click:Connect(function()
-    if isPlaying then
-        fireRemoteEvent("0")
-        stopVisualTimer()
-    else
-        local idText = IDInput.Text:match("%d+")
-        if idText and #idText > 0 then
-            fireRemoteEvent(idText)
-            task.spawn(function()
-                local s, info = pcall(function() return MarketplaceService:GetProductInfo(tonumber(idText)) end)
-                local duration = (s and info and info.Duration) and tonumber(info.Duration) or 180
-                if duration == 0 then duration = 180 end
-                startVisualTimer(duration)
-            end)
+    local id = IDInput.Text
+    if id ~= "" then
+        local encoded = encodeID(id)
+        
+        -- ดึง Remote ตามลำดับ ReplicatedStorage -> RE -> PlayerToolEvent
+        local rs = game:GetService(D[2])
+        local re = rs:WaitForChild("RE", 5)
+        
+        if re then
+            local event = re:WaitForChild(D[14], 5)
+            if event then
+                -- รูปแบบการส่งแบบ Unpack Args [4] = true เพื่อให้เพลงเปิดติดแน่นอน
+                local args = {
+                    [1] = D[15],   -- "ToolMusicText"
+                    [2] = encoded, -- ID แบบ Hex (1000 หลัก)
+                    [4] = true
+                }
+                
+                event:FireServer(unpack(args))
+                
+                PlayBtn.Text = "SENT!"
+                task.wait(1)
+                PlayBtn.Text = "PLAY MUSIC"
+            end
         end
     end
 end)
