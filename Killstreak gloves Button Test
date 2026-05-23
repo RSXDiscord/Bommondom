@@ -44,15 +44,17 @@ Title.TextSize = 18
 Title.BackgroundTransparency = 1
 Title.Parent = MainFrame
 
--- [[ ระบบออโต้คลิก UI SERVER SPEED ]] --
+-- [[ ระบบออโต้คลิก UI SERVER SPEED (อัปเดตปุ่มใหม่) ]] --
 task.spawn(function()
     while true do
         RunService.Heartbeat:Wait()
         if _G.AutoClick then
             pcall(function()
-                local btn = Player.PlayerGui.GlovesButton.KillstreakBtn
+                -- เปลี่ยนมาใช้ตำแหน่งปุ่มใหม่ตามที่ระบุ
+                local btn = Player:WaitForChild("PlayerGui"):WaitForChild("GlovesCont"):WaitForChild("Buttons"):WaitForChild("KillstreakBtn")
                 if btn then
                     firesignal(btn.MouseButton1Click)
+                    firesignal(btn.MouseButton1Down)
                     firesignal(btn.Activated)
                     for _, v in pairs(btn:GetDescendants()) do
                         if v:IsA("RemoteEvent") then v:FireServer() end
