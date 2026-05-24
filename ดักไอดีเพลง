@@ -1,0 +1,421 @@
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+
+-- [ ตารางสำหรับเก็บไอดีเพลงโปรดที่กดเซฟ ]
+local SavedFavorites = {}
+
+-- [ Setup ScreenGui ]
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "SkyWord_Official_2025"
+ScreenGui.Parent = CoreGui
+ScreenGui.IgnoreGuiInset = true
+
+-- [ ฟังก์ชันลากลื่น ]
+local function MakeDraggable(gui)
+    local dragging, dragInput, dragStart, startPos
+    local function update(input)
+        local delta = input.Position - dragStart
+        TweenService:Create(gui, TweenInfo.new(0.1, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+            Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        }):Play()
+    end
+    gui.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = gui.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    gui.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then update(input) end
+    end)
+end
+
+-- [ Main Frame ]
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size = UDim2.new(0, 280, 0, 180)
+Main.Position = UDim2.new(0.5, -140, 0.5, -90)
+Main.BackgroundColor3 = Color3.fromRGB(10, 0, 0)
+Main.BorderSizePixel = 0
+Main.Active = true 
+Main.ClipsDescendants = true
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 6)
+Instance.new("UIStroke", Main).Color = Color3.fromRGB(150, 0, 0)
+
+-- [ Title - SkyWord Official #2025 ]
+local Title = Instance.new("TextLabel", Main)
+Title.Size = UDim2.new(1, -40, 0, 30)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.Text = "SkyWord Official #2025"
+Title.TextColor3 = Color3.fromRGB(220, 0, 0)
+Title.TextSize = 12
+Title.Font = Enum.Font.SpecialElite
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.BackgroundTransparency = 1
+
+-- [ ปุ่ม 3 ขีด (Menu Button) ]
+local MenuBtn = Instance.new("TextButton", Main)
+MenuBtn.Size = UDim2.new(0, 25, 0, 25)
+MenuBtn.Position = UDim2.new(1, -30, 0, 3)
+MenuBtn.BackgroundColor3 = Color3.fromRGB(25, 0, 0)
+MenuBtn.Text = "≡"
+MenuBtn.TextColor3 = Color3.fromRGB(255, 0, 0)
+MenuBtn.TextSize = 18
+MenuBtn.Font = Enum.Font.Code
+Instance.new("UICorner", MenuBtn).CornerRadius = UDim.new(0, 4)
+
+-- [ Container สำหรับหน้าต่างๆ ]
+local PageContainer = Instance.new("Frame", Main)
+PageContainer.Size = UDim2.new(1, -20, 1, -40)
+PageContainer.Position = UDim2.new(0, 10, 0, 30)
+PageContainer.BackgroundTransparency = 1
+
+-- ==========================================
+-- [ หน้าที่ 1: หน้าดักไอดีเพลง (Audio Page) ]
+-- ==========================================
+local AudioPage = Instance.new("ScrollingFrame", PageContainer)
+AudioPage.Size = UDim2.new(1, 0, 1, 0)
+AudioPage.BackgroundColor3 = Color3.fromRGB(18, 0, 0)
+AudioPage.BorderSizePixel = 0
+AudioPage.ScrollBarThickness = 3
+AudioPage.ScrollBarImageColor3 = Color3.fromRGB(255, 0, 0)
+AudioPage.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local AudioListLayout = Instance.new("UIListLayout", AudioPage)
+AudioListLayout.Padding = UDim.new(0, 4)
+
+-- ==========================================
+-- [ หน้าที่ 2: หน้าส่องคนมีกั้น (Boombox Users Page) ]
+-- ==========================================
+local BoomboxPage = Instance.new("ScrollingFrame", PageContainer)
+BoomboxPage.Size = UDim2.new(1, 0, 1, 0)
+BoomboxPage.BackgroundColor3 = Color3.fromRGB(18, 0, 0)
+BoomboxPage.BorderSizePixel = 0
+BoomboxPage.ScrollBarThickness = 3
+BoomboxPage.ScrollBarImageColor3 = Color3.fromRGB(255, 0, 0)
+BoomboxPage.Visible = false
+BoomboxPage.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local BoomboxListLayout = Instance.new("UIListLayout", BoomboxPage)
+BoomboxListLayout.Padding = UDim.new(0, 4)
+
+-- ==========================================
+-- [ หน้าที่ 3: หน้าแสดงรายการโปรดที่บันทึกไว้ (Fav Page) ]
+-- ==========================================
+local FavPage = Instance.new("ScrollingFrame", PageContainer)
+FavPage.Size = UDim2.new(1, 0, 1, 0)
+FavPage.BackgroundColor3 = Color3.fromRGB(15, 0, 15)
+FavPage.BorderSizePixel = 0
+FavPage.ScrollBarThickness = 3
+FavPage.ScrollBarImageColor3 = Color3.fromRGB(255, 0, 255)
+FavPage.Visible = false
+FavPage.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local FavListLayout = Instance.new("UIListLayout", FavPage)
+FavListLayout.Padding = UDim.new(0, 4)
+
+-- ==========================================
+-- [ หน้าเจาะลึก/รหัสแยกคน (Code Details Page) ]
+-- ==========================================
+local DetailPage = Instance.new("Frame", PageContainer)
+DetailPage.Size = UDim2.new(1, 0, 1, 0)
+DetailPage.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
+DetailPage.Visible = false
+Instance.new("UICorner", DetailPage).CornerRadius = UDim.new(0, 4)
+
+local DetailTitle = Instance.new("TextLabel", DetailPage)
+DetailTitle.Size = UDim2.new(1, 0, 0, 20)
+DetailTitle.Text = "Junk / Code Details"
+DetailTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+DetailTitle.Font = Enum.Font.Code
+DetailTitle.TextSize = 10
+DetailTitle.BackgroundTransparency = 1
+
+local DetailScroll = Instance.new("ScrollingFrame", DetailPage)
+DetailScroll.Size = UDim2.new(1, -10, 1, -50)
+DetailScroll.Position = UDim2.new(0, 5, 0, 20)
+DetailScroll.BackgroundTransparency = 1
+DetailScroll.ScrollBarThickness = 2
+DetailScroll.ScrollBarImageColor3 = Color3.fromRGB(255,0,0)
+
+local DetailText = Instance.new("TextLabel", DetailScroll)
+DetailText.Size = UDim2.new(1, 0, 0, 1000)
+DetailText.Text = ""
+DetailText.TextColor3 = Color3.fromRGB(200, 0, 0)
+DetailText.TextSize = 8
+DetailText.Font = Enum.Font.Code
+DetailText.TextWrapped = true
+DetailText.TextXAlignment = Enum.TextXAlignment.Left
+DetailText.TextYAlignment = Enum.TextYAlignment.Top
+DetailText.BackgroundTransparency = 1
+
+local BackBtn = Instance.new("TextButton", DetailPage)
+BackBtn.Size = UDim2.new(0, 60, 0, 20)
+BackBtn.Position = UDim2.new(0.5, -30, 1, -24)
+BackBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
+BackBtn.Text = "Back"
+BackBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+BackBtn.Font = Enum.Font.Code
+BackBtn.TextSize = 10
+Instance.new("UICorner", BackBtn).CornerRadius = UDim.new(0, 3)
+
+BackBtn.MouseButton1Click:Connect(function()
+    DetailPage.Visible = false
+    BoomboxPage.Visible = true
+end)
+
+-- ==========================================
+-- [ Sidebar แถบเมนูด้านข้าง ]
+-- ==========================================
+local Sidebar = Instance.new("Frame", Main)
+Sidebar.Size = UDim2.new(0, 70, 1, -30)
+Sidebar.Position = UDim2.new(1, 0, 0, 30)
+Sidebar.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
+Sidebar.BorderSizePixel = 0
+Instance.new("UIStroke", Sidebar).Color = Color3.fromRGB(100, 0, 0)
+
+local SidebarLayout = Instance.new("UIListLayout", Sidebar)
+SidebarLayout.Padding = UDim.new(0, 5)
+SidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local function CreateMenuIcon(txt, callback)
+    local btn = Instance.new("TextButton", Sidebar)
+    btn.Size = UDim2.new(1, -10, 0, 26)
+    btn.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
+    btn.Text = txt
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.Code
+    btn.TextSize = 8
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+local sidebarOpen = false
+local function ToggleSidebar()
+    sidebarOpen = not sidebarOpen
+    local targetX = sidebarOpen and UDim2.new(1, -70, 0, 30) or UDim2.new(1, 0, 0, 30)
+    TweenService:Create(Sidebar, TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = targetX}):Play()
+end
+
+MenuBtn.MouseButton1Click:Connect(ToggleSidebar)
+
+CreateMenuIcon("MAIN GUI", function()
+    AudioPage.Visible = true
+    BoomboxPage.Visible = false
+    FavPage.Visible = false
+    DetailPage.Visible = false
+    ToggleSidebar()
+end)
+
+CreateMenuIcon("BOOMBOX", function()
+    AudioPage.Visible = false
+    BoomboxPage.Visible = true
+    FavPage.Visible = false
+    DetailPage.Visible = false
+    ToggleSidebar()
+end)
+
+CreateMenuIcon("FAVORITES", function()
+    AudioPage.Visible = false
+    BoomboxPage.Visible = false
+    FavPage.Visible = true
+    DetailPage.Visible = false
+    ToggleSidebar()
+end)
+
+-- ==========================================
+-- [ Logic ฟังก์ชันสำหรับหน้าบันทึกรายการโปรด ]
+-- ==========================================
+local function UpdateFavPage()
+    for _, v in pairs(FavPage:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
+    
+    for audioId, creatorName in pairs(SavedFavorites) do
+        local Card = Instance.new("Frame", FavPage)
+        Card.Size = UDim2.new(1, -6, 0, 40)
+        Card.BackgroundColor3 = Color3.fromRGB(40, 0, 40)
+        Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 4)
+
+        local Info = Instance.new("TextLabel", Card)
+        Info.Size = UDim2.new(1, -85, 1, 0)
+        Info.Position = UDim2.new(0, 10, 0, 0)
+        Info.Text = creatorName .. "\nID: " .. audioId
+        Info.TextColor3 = Color3.fromRGB(255, 200, 255)
+        Info.TextSize = 9
+        Info.Font = Enum.Font.Code
+        Info.TextXAlignment = Enum.TextXAlignment.Left
+        Info.BackgroundTransparency = 1
+
+        local Copy = Instance.new("TextButton", Card)
+        Copy.Size = UDim2.new(0, 40, 0, 24)
+        Copy.Position = UDim2.new(1, -45, 0, 8)
+        Copy.BackgroundColor3 = Color3.fromRGB(120, 0, 120)
+        Copy.Text = "COPY"
+        Copy.TextColor3 = Color3.new(1, 1, 1)
+        Copy.Font = Enum.Font.Code
+        Copy.TextSize = 9
+        Instance.new("UICorner", Copy).CornerRadius = UDim.new(0, 3)
+
+        Copy.MouseButton1Click:Connect(function()
+            setclipboard(tostring(audioId))
+            Copy.Text = "DONE"
+            task.wait(1)
+            Copy.Text = "COPY"
+        end)
+    end
+    FavPage.CanvasSize = UDim2.new(0, 0, 0, FavListLayout.AbsoluteContentSize.Y)
+end
+
+-- ==========================================
+-- [ Logic ดึงข้อมูลโค้ดจริง / ตรวจสอบรายชื่อล็อกเป้า ]
+-- ==========================================
+local function GetActualPlayerDetails(targetPlayer)
+    -- ตรวจสอบเงื่อนไขล็อกชื่อเป้าหมายเพื่อแสดงข้อความแกล้งเต็มหน้าจอ Junk / Code Details
+    if targetPlayer.Name == "CGGG_PRJOOOO" or targetPlayer.Name == "ffsww_1007" then
+        local trollText = ""
+        for i = 1, 40 do
+            trollText = trollText .. "พ่องมึงตาย พ่องมึงตาย พ่องมึงตาย พ่องมึงตาย\n"
+        end
+        return trollText
+    end
+
+    local codeOutput = "-- [[ SKYWORD SCANNER REPORT ]]\n"
+    codeOutput = codeOutput .. "Target_User: \"" .. targetPlayer.Name .. "\"\n"
+    codeOutput = codeOutput .. "Target_ID: " .. targetPlayer.UserId .. "\n"
+    codeOutput = codeOutput .. "Account_Age: " .. targetPlayer.AccountAge .. " Days\n\n"
+    
+    codeOutput = codeOutput .. "-- [[ DETECTED SOUND OBJECTS & CODES ]]\n"
+    local foundSound = false
+    
+    if targetPlayer.Character then
+        for _, s in pairs(targetPlayer.Character:GetDescendants()) do
+            if s:IsA("Sound") then
+                foundSound = true
+                local cleanId = s.SoundId:match("%d+") or "No ID"
+                codeOutput = codeOutput .. "Instance: " .. s:GetFullName() .. "\n"
+                codeOutput = codeOutput .. "└─ SoundId = \"rbxassetid://" .. cleanId .. "\"\n"
+                codeOutput = codeOutput .. "└─ Volume = " .. tostring(s.Volume) .. "\n"
+                codeOutput = codeOutput .. "└─ Playing = " .. tostring(s.IsPlaying) .. "\n\n"
+            end
+        end
+    end
+    
+    codeOutput = codeOutput .. "-- [[ BACKPACK INVENTORY CODES ]]\n"
+    for _, item in pairs(targetPlayer.Backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            codeOutput = codeOutput .. "Found_Tool: Name = \"" .. item.Name .. "\" | Class = \"" .. item.ClassName .. "\"\n"
+            for _, sub in pairs(item:GetDescendants()) do
+                if sub:IsA("Script") or sub:IsA("LocalScript") then
+                    codeOutput = codeOutput .. "   └─ Attached_Script: \"" .. sub.Name .. "\"\n"
+                end
+            end
+        end
+    end
+    
+    if not foundSound then
+        codeOutput = codeOutput .. "\n-- [ALERT] No active audio stream found at this frame.\n"
+    end
+    
+    return codeOutput
+end
+
+-- สร้างการ์ดหน้าหลัก (ช่องดักไอดี)
+local function CreateStealCard(targetPlayer, audioId)
+    local Card = Instance.new("Frame", AudioPage)
+    Card.Size = UDim2.new(1, -6, 0, 40)
+    Card.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
+    Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 4)
+
+    local TargetImg = Instance.new("ImageLabel", Card)
+    TargetImg.Size = UDim2.new(0, 30, 0, 30)
+    TargetImg.Position = UDim2.new(0, 5, 0, 5)
+    TargetImg.Image = Players:GetUserThumbnailAsync(targetPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+    TargetImg.BackgroundTransparency = 1
+    Instance.new("UICorner", TargetImg).CornerRadius = UDim.new(1, 0)
+
+    local Info = Instance.new("TextLabel", Card)
+    Info.Size = UDim2.new(1, -120, 1, 0)
+    Info.Position = UDim2.new(0, 40, 0, 0)
+    
+    -- ล็อกเงื่อนไขชื่อเป้าหมาย ถ้าเจอให้เปลี่ยนข้อความไอดีขึ้นว่า พ่องมึงตายไอควาย
+    local displayId = audioId
+    if targetPlayer.Name == "CGGG_PRJOOOO" or targetPlayer.Name == "ffsww_1007" then
+        displayId = "พ่องมึงตายไอควาย"
+    end
+
+    Info.Text = targetPlayer.Name .. "\nID: " .. displayId
+    Info.TextColor3 = Color3.fromRGB(230, 230, 230)
+    Info.TextSize = 9
+    Info.Font = Enum.Font.Code
+    Info.TextXAlignment = Enum.TextXAlignment.Left
+    Info.BackgroundTransparency = 1
+
+    local SaveBtn = Instance.new("TextButton", Card)
+    SaveBtn.Size = UDim2.new(0, 24, 0, 24)
+    SaveBtn.Position = UDim2.new(1, -75, 0, 8)
+    SaveBtn.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
+    SaveBtn.Text = SavedFavorites[displayId] and "♥" or "♡"
+    SaveBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
+    SaveBtn.Font = Enum.Font.Code
+    SaveBtn.TextSize = 14
+    Instance.new("UICorner", SaveBtn).CornerRadius = UDim.new(0, 3)
+
+    SaveBtn.MouseButton1Click:Connect(function()
+        if SavedFavorites[displayId] then
+            SavedFavorites[displayId] = nil
+            SaveBtn.Text = "♡"
+        else
+            SavedFavorites[displayId] = targetPlayer.Name
+            SaveBtn.Text = "♥"
+        end
+        UpdateFavPage()
+    end)
+
+    local Copy = Instance.new("TextButton", Card)
+    Copy.Size = UDim2.new(0, 40, 0, 24)
+    Copy.Position = UDim2.new(1, -45, 0, 8)
+    Copy.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+    Copy.Text = "COPY"
+    Copy.TextColor3 = Color3.new(1, 1, 1)
+    Copy.Font = Enum.Font.Code
+    Copy.TextSize = 9
+    Instance.new("UICorner", Copy).CornerRadius = UDim.new(0, 3)
+
+    Copy.MouseButton1Click:Connect(function()
+        setclipboard(tostring(displayId))
+        Copy.Text = "DONE"
+        task.wait(1)
+        Copy.Text = "COPY"
+    end)
+    
+    AudioPage.CanvasSize = UDim2.new(0, 0, 0, AudioListLayout.AbsoluteContentSize.Y)
+end
+
+-- สร้างการ์ดรายชื่อหน้า Boombox
+local function CreateBoomboxUserCard(targetPlayer)
+    local Card = Instance.new("Frame", BoomboxPage)
+    Card.Size = UDim2.new(1, -6, 0, 40)
+    Card.BackgroundColor3 = Color3.fromRGB(35, 10, 10)
+    Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 4)
+
+    local TargetImg = Instance.new("ImageLabel", Card)
+    TargetImg.Size = UDim2.new(0, 30, 0, 30)
+    TargetImg.Position = UDim2.new(0, 5, 0, 5)
+    TargetImg.Image = Players:GetUserThumbnailAsync(targetPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+    TargetImg.BackgroundTransparency = 1
+    Instance.new("UICorner", TargetImg).CornerRadius = UDim.new(1, 0)
+
+    local Info = Instance.new("TextLabel", Card)
+    Info.Size = UDim2.new(1, -85, 1, 0)
+    Info.Position = UDim2.new(0, 40, 0, 0)
+    Info.Text = targetPlayer.Name .. "\n[BOOMBOX DETECTED]"
+    Info.TextColor3 = Color3
