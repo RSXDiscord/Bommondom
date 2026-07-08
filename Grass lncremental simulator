@@ -1,0 +1,114 @@
+-- [[ RSX SCRIPT by ffsww_1007 ]] --
+local Player = game.Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+
+-- ลบ UI เก่า
+if game.CoreGui:FindFirstChild("AutoFarmUI") then
+    game.CoreGui.AutoFarmUI:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AutoFarmUI"
+ScreenGui.Parent = game.CoreGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Parent = ScreenGui
+MainFrame.Size = UDim2.new(0, 200, 0, 370)
+MainFrame.Position = UDim2.new(0.5, -100, 0.5, -185)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 0, 0)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+Instance.new("UICorner", MainFrame)
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Text = "RSX SCRIPT"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.SpecialElite
+Title.TextSize = 18
+Title.BackgroundTransparency = 1
+
+local Footer = Instance.new("TextLabel", MainFrame)
+Footer.Size = UDim2.new(1, 0, 0, 30)
+Footer.Position = UDim2.new(0, 0, 0, 330)
+Footer.Text = "Development @000"
+Footer.TextColor3 = Color3.fromRGB(150, 150, 150)
+Footer.Font = Enum.Font.Code
+Footer.TextSize = 12
+Footer.BackgroundTransparency = 1
+
+local function CreateToggle(name, yPos, callback)
+    local btn = Instance.new("TextButton", MainFrame)
+    btn.Size = UDim2.new(0.8, 0, 0, 40)
+    btn.Position = UDim2.new(0.1, 0, 0, yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(60, 0, 0)
+    btn.Text = "OFF: " .. name
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SpecialElite
+    Instance.new("UICorner", btn)
+    
+    local running = false
+    btn.MouseButton1Click:Connect(function()
+        running = not running
+        btn.Text = (running and "ON: " or "OFF: ") .. name
+        callback(running)
+    end)
+end
+
+-- สร้างปุ่ม 5 ปุ่ม
+CreateToggle("Auto Grass (Normal)", 50, function(state)
+    task.spawn(function()
+        while state do
+            Remotes.GrassCollect:FireServer({["normal"] = 1, ["diamond"] = 0, ["silver"] = 0, ["ruby"] = 0, ["golden"] = 0})
+            task.wait()
+            if not state then break end
+        end
+    end)
+end)
+
+CreateToggle("Auto Grass (Diamond)", 100, function(state)
+    task.spawn(function()
+        while state do
+            Remotes.GrassCollect:FireServer({["normal"] = 0, ["diamond"] = 1, ["silver"] = 0, ["ruby"] = 0, ["golden"] = 0})
+            task.wait()
+            if not state then break end
+        end
+    end)
+end)
+
+CreateToggle("Auto Upgrade", 150, function(state)
+    task.spawn(function()
+        while state do
+            Remotes.Upgrade:FireServer({{["currencyName"] = "Grass", ["autoBuy"] = false, ["amount"] = 35, ["max"] = 99, ["cost"] = 650782, ["upgradeValue"] = "GrassValue"}})
+            task.wait(1)
+            if not state then break end
+        end
+    end)
+end)
+
+CreateToggle("Auto Rebirth", 200, function(state)
+    task.spawn(function()
+        while state do
+            Remotes.Rebirth:FireServer()
+            task.wait(2)
+            if not state then break end
+        end
+    end)
+end)
+
+CreateToggle("WalkSpeed", 250, function(state)
+    task.spawn(function()
+        while state do
+            if Player.Character and Player.Character:FindFirstChild("Humanoid") then
+                Player.Character.Humanoid.WalkSpeed = 50
+            end
+            task.wait(0.1)
+            if not state then break end
+        end
+        if Player.Character and Player.Character:FindFirstChild("Humanoid") then
+            Player.Character.Humanoid.WalkSpeed = 16
+        end
+    end)
+end)
