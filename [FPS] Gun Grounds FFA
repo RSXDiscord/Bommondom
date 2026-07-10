@@ -1,0 +1,187 @@
+-- [[ RSX SCRIPT by ffsww_1007 ]] --
+local Player = game.Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local RunService = game:GetService("RunService")
+
+-- ลบ UI เก่า
+if game.CoreGui:FindFirstChild("AutoFarmUI") then
+    game.CoreGui.AutoFarmUI:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AutoFarmUI"
+ScreenGui.Parent = game.CoreGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Parent = ScreenGui
+MainFrame.Size = UDim2.new(0, 200, 0, 500)
+MainFrame.Position = UDim2.new(0.5, -100, 0.5, -250)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 0, 0)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+Instance.new("UICorner", MainFrame)
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Text = "RSX SCRIPT"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.SpecialElite
+Title.TextSize = 18
+Title.BackgroundTransparency = 1
+
+local Footer = Instance.new("TextLabel", MainFrame)
+Footer.Size = UDim2.new(1, 0, 0, 30)
+Footer.Position = UDim2.new(0, 0, 0, 460)
+Footer.Text = "Development @000"
+Footer.TextColor3 = Color3.fromRGB(150, 150, 150)
+Footer.Font = Enum.Font.Code
+Footer.TextSize = 12
+Footer.BackgroundTransparency = 1
+
+local MenuBtn = Instance.new("TextButton", MainFrame)
+MenuBtn.Size = UDim2.new(0, 40, 0, 40)
+MenuBtn.Position = UDim2.new(0.8, 0, 0, 0)
+MenuBtn.Text = "≡"
+MenuBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+MenuBtn.BackgroundTransparency = 1
+MenuBtn.Font = Enum.Font.SourceSansBold
+MenuBtn.TextSize = 30
+
+local BaconBtn = Instance.new("TextButton", MainFrame)
+BaconBtn.Size = UDim2.new(0, 160, 0, 30)
+BaconBtn.Position = UDim2.new(0.1, 0, 0, 420)
+BaconBtn.Text = "Bacon Mode (OFF)"
+BaconBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
+BaconBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+BaconBtn.Font = Enum.Font.SpecialElite
+Instance.new("UICorner", BaconBtn)
+BaconBtn.Visible = false
+
+MenuBtn.MouseButton1Click:Connect(function()
+    BaconBtn.Visible = not BaconBtn.Visible
+    MenuBtn:TweenRotation(MenuBtn.Rotation == 0 and 90 or 0, "Out", "Quad", 0.3)
+end)
+
+local function CreateToggle(name, yPos, callback)
+    local btn = Instance.new("TextButton", MainFrame)
+    btn.Size = UDim2.new(0.8, 0, 0, 35)
+    btn.Position = UDim2.new(0.1, 0, 0, yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(60, 0, 0)
+    btn.Text = "OFF: " .. name
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.SpecialElite
+    Instance.new("UICorner", btn)
+    local running = false
+    btn.MouseButton1Click:Connect(function()
+        running = not running
+        btn.Text = (running and "ON: " or "OFF: ") .. name
+        callback(running)
+    end)
+end
+
+CreateToggle("Auto Classic Camera", 45, function(state)
+    _G.AutoCam = state
+    RunService.RenderStepped:Connect(function()
+        if _G.AutoCam then
+            Player.CameraMode = Enum.CameraMode.Classic
+            Player.DevComputerCameraMode = Enum.DevComputerCameraMode.Classic
+        end
+    end)
+end)
+
+CreateToggle("Silent Aim / Lock", 85, function(state)
+    _G.Silent = state
+    RunService.RenderStepped:Connect(function()
+        if _G.Silent then
+            local target = nil
+            local dist = math.huge
+            for _, p in pairs(game.Players:GetPlayers()) do
+                if p ~= Player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local d = (p.Character.HumanoidRootPart.Position - Player.Character.HumanoidRootPart.Position).Magnitude
+                    if d < dist then target = p.Character.HumanoidRootPart dist = d end
+                end
+            end
+            if target then workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, target.Position) end
+        end
+    end)
+end)
+
+CreateToggle("Spin Bot", 125, function(state)
+    _G.Spin = state
+    Player.CharacterAdded:Connect(function(char)
+        if _G.Spin then
+            task.spawn(function()
+                while _G.Spin do
+                    char:WaitForChild("HumanoidRootPart").CFrame = char.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(45), 0)
+                    task.wait()
+                end
+            end)
+        end
+    end)
+    task.spawn(function()
+        while _G.Spin do
+            if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+                Player.Character.HumanoidRootPart.CFrame = Player.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(45), 0)
+            end
+            task.wait()
+        end
+    end)
+end)
+
+CreateToggle("Zig Zag", 165, function(state)
+    _G.ZigZag = state
+    task.spawn(function()
+        while _G.ZigZag do
+            if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+                Player.Character.HumanoidRootPart.CFrame = Player.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(30), 0)
+                task.wait(0.05)
+                Player.Character.HumanoidRootPart.CFrame = Player.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(-30), 0)
+                task.wait(0.05)
+            end
+            task.wait()
+        end
+    end)
+end)
+
+CreateToggle("Speed Hack", 205, function(state)
+    Player.Character.Humanoid.WalkSpeed = state and 50 or 16
+end)
+
+CreateToggle("Grip/Metatable Mod", 245, function(state)
+    if state then
+        local mt = getrawmetatable(game)
+        setreadonly(mt, false)
+        local old = mt.__namecall
+        mt.__namecall = newcclosure(function(self, ...)
+            local args = {...}
+            if getnamecallmethod() == "FireServer" and tostring(self) == "Action" then
+                args[2] = "hit"
+            end
+            return old(self, unpack(args))
+        end)
+    end
+end)
+
+local baconActive = false
+BaconBtn.MouseButton1Click:Connect(function()
+    baconActive = not baconActive
+    BaconBtn.Text = baconActive and "Bacon Mode (ON)" or "Bacon Mode (OFF)"
+    if baconActive then
+        task.spawn(function()
+            while baconActive do
+                local mobs = workspace:FindFirstChild("Mobs")
+                if mobs then
+                    for _, mob in pairs(mobs:GetChildren()) do
+                        if mob:FindFirstChild("HumanoidRootPart") then
+                            Player.Character.HumanoidRootPart.CFrame = mob.HumanoidRootPart.CFrame * CFrame.new(0, 5, 0)
+                            task.wait(0.01)
+                        end
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+    end
+end)
