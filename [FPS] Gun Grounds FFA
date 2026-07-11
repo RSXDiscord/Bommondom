@@ -5,23 +5,40 @@ local Remotes = ReplicatedStorage:WaitForChild("Remotes")
 local RunService = game:GetService("RunService")
 
 -- ลบ UI เก่า
-if game.CoreGui:FindFirstChild("AutoFarmUI") then
-    game.CoreGui.AutoFarmUI:Destroy()
+if game.CoreGui:FindFirstChild("InGameScreen") then game.CoreGui.InGameScreen:Destroy() end
+if game.CoreGui:FindFirstChild("MoblieControls") then game.CoreGui.MoblieControls:Destroy() end
+
+local function SetupRainbow(object)
+    task.spawn(function()
+        local hue = 0
+        while object and object.Parent do
+            hue = hue + 0.005
+            if hue > 1 then hue = 0 end
+            object.BackgroundColor3 = Color3.fromHSV(hue, 1, 1)
+            task.wait(0.05)
+        end
+    end)
 end
 
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "AutoFarmUI"
+ScreenGui.Name = "InGameScreen"
 ScreenGui.Parent = game.CoreGui
+SetupRainbow(ScreenGui)
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Parent = ScreenGui
-MainFrame.Size = UDim2.new(0, 200, 0, 500)
-MainFrame.Position = UDim2.new(0.5, -100, 0.5, -250)
+MainFrame.Size = UDim2.new(0, 200, 0, 580)
+MainFrame.Position = UDim2.new(0.5, -100, 0.5, -290)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 0, 0)
 MainFrame.BorderSizePixel = 0
 MainFrame.Active = true
 MainFrame.Draggable = true
 Instance.new("UICorner", MainFrame)
+
+local MobileGui = Instance.new("ScreenGui")
+MobileGui.Name = "MoblieControls"
+MobileGui.Parent = game.CoreGui
+SetupRainbow(MobileGui)
 
 local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(1, 0, 0, 40)
@@ -33,7 +50,7 @@ Title.BackgroundTransparency = 1
 
 local Footer = Instance.new("TextLabel", MainFrame)
 Footer.Size = UDim2.new(1, 0, 0, 30)
-Footer.Position = UDim2.new(0, 0, 0, 460)
+Footer.Position = UDim2.new(0, 0, 0, 540)
 Footer.Text = "Development @000"
 Footer.TextColor3 = Color3.fromRGB(150, 150, 150)
 Footer.Font = Enum.Font.Code
@@ -51,7 +68,7 @@ MenuBtn.TextSize = 30
 
 local BaconBtn = Instance.new("TextButton", MainFrame)
 BaconBtn.Size = UDim2.new(0, 160, 0, 30)
-BaconBtn.Position = UDim2.new(0.1, 0, 0, 420)
+BaconBtn.Position = UDim2.new(0.1, 0, 0, 500)
 BaconBtn.Text = "Bacon Mode (OFF)"
 BaconBtn.BackgroundColor3 = Color3.fromRGB(80, 0, 0)
 BaconBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -81,7 +98,21 @@ local function CreateToggle(name, yPos, callback)
     end)
 end
 
-CreateToggle("Auto Classic Camera", 45, function(state)
+_G.AimPart = "Head"
+local LockBtn = Instance.new("TextButton", MainFrame)
+LockBtn.Size = UDim2.new(0.8, 0, 0, 35)
+LockBtn.Position = UDim2.new(0.1, 0, 0, 45)
+LockBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
+LockBtn.Text = "Lock: Head"
+LockBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+LockBtn.Font = Enum.Font.SpecialElite
+Instance.new("UICorner", LockBtn)
+LockBtn.MouseButton1Click:Connect(function()
+    _G.AimPart = (_G.AimPart == "Head") and "HumanoidRootPart" or "Head"
+    LockBtn.Text = "Lock: " .. _G.AimPart
+end)
+
+CreateToggle("Auto Classic Camera", 85, function(state)
     _G.AutoCam = state
     RunService.RenderStepped:Connect(function()
         if _G.AutoCam then
@@ -91,16 +122,16 @@ CreateToggle("Auto Classic Camera", 45, function(state)
     end)
 end)
 
-CreateToggle("Silent Aim / Lock", 85, function(state)
+CreateToggle("Silent Aim / Lock", 125, function(state)
     _G.Silent = state
     RunService.RenderStepped:Connect(function()
         if _G.Silent then
             local target = nil
             local dist = math.huge
             for _, p in pairs(game.Players:GetPlayers()) do
-                if p ~= Player and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                    local d = (p.Character.HumanoidRootPart.Position - Player.Character.HumanoidRootPart.Position).Magnitude
-                    if d < dist then target = p.Character.HumanoidRootPart dist = d end
+                if p ~= Player and p.Character and p.Character:FindFirstChild(_G.AimPart) then
+                    local d = (p.Character[_G.AimPart].Position - Player.Character.HumanoidRootPart.Position).Magnitude
+                    if d < dist then target = p.Character[_G.AimPart] dist = d end
                 end
             end
             if target then workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, target.Position) end
@@ -108,18 +139,49 @@ CreateToggle("Silent Aim / Lock", 85, function(state)
     end)
 end)
 
-CreateToggle("Spin Bot", 125, function(state)
-    _G.Spin = state
-    Player.CharacterAdded:Connect(function(char)
-        if _G.Spin then
-            task.spawn(function()
-                while _G.Spin do
-                    char:WaitForChild("HumanoidRootPart").CFrame = char.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(45), 0)
-                    task.wait()
+CreateToggle("Sky Hunter Mode", 165, function(state)
+    _G.SkyHunter = state
+    task.spawn(function()
+        while _G.SkyHunter do
+            local targetPlayer = nil
+            local dist = math.huge
+            for _, p in pairs(game.Players:GetPlayers()) do
+                if p ~= Player and p.Character and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 and p.Character:FindFirstChild("Head") then
+                    local d = (p.Character.Head.Position - Player.Character.HumanoidRootPart.Position).Magnitude
+                    if d < dist then targetPlayer = p.Character.Head dist = d end
                 end
-            end)
+            end
+            if targetPlayer then
+                Player.Character.HumanoidRootPart.CFrame = CFrame.new(0, -50, 0)
+                workspace.CurrentCamera.CameraSubject = targetPlayer
+            end
+            task.wait(0.1)
+        end
+        workspace.CurrentCamera.CameraSubject = Player.Character
+    end)
+    
+    -- No Clip Loop
+    RunService.Stepped:Connect(function()
+        if _G.SkyHunter and Player.Character then
+            for _, v in pairs(Player.Character:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.CanCollide = false
+                end
+            end
         end
     end)
+
+    RunService.Heartbeat:Connect(function()
+        if _G.SkyHunter and Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
+            if Player.Character.HumanoidRootPart.Position.Y > -40 then
+                Player.Character.HumanoidRootPart.CFrame = CFrame.new(Player.Character.HumanoidRootPart.Position.X, -50, Player.Character.HumanoidRootPart.Position.Z)
+            end
+        end
+    end)
+end)
+
+CreateToggle("Spin Bot", 205, function(state)
+    _G.Spin = state
     task.spawn(function()
         while _G.Spin do
             if Player.Character and Player.Character:FindFirstChild("HumanoidRootPart") then
@@ -130,7 +192,7 @@ CreateToggle("Spin Bot", 125, function(state)
     end)
 end)
 
-CreateToggle("Zig Zag", 165, function(state)
+CreateToggle("Zig Zag", 245, function(state)
     _G.ZigZag = state
     task.spawn(function()
         while _G.ZigZag do
@@ -145,11 +207,11 @@ CreateToggle("Zig Zag", 165, function(state)
     end)
 end)
 
-CreateToggle("Speed Hack", 205, function(state)
+CreateToggle("Speed Hack", 285, function(state)
     Player.Character.Humanoid.WalkSpeed = state and 50 or 16
 end)
 
-CreateToggle("Grip/Metatable Mod", 245, function(state)
+CreateToggle("Grip/Metatable Mod", 325, function(state)
     if state then
         local mt = getrawmetatable(game)
         setreadonly(mt, false)
@@ -171,7 +233,7 @@ BaconBtn.MouseButton1Click:Connect(function()
     if baconActive then
         task.spawn(function()
             while baconActive do
-                local mobs = workspace:FindFirstChild("Mobs")
+                local mobs = workspace:FindFirstChild("Mobs") or workspace:FindFirstChild("Enemies")
                 if mobs then
                     for _, mob in pairs(mobs:GetChildren()) do
                         if mob:FindFirstChild("HumanoidRootPart") then
