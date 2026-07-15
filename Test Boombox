@@ -1,0 +1,110 @@
+-- [[ RSX SCRIPT by ffsww_1007 ]] --
+local Player = game.Players.LocalPlayer
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local RunService = game:GetService("RunService")
+
+-- ลบ UI เก่า
+if game.CoreGui:FindFirstChild("InGameScreen") then game.CoreGui.InGameScreen:Destroy() end
+if game.CoreGui:FindFirstChild("MoblieControls") then game.CoreGui.MoblieControls:Destroy() end
+
+local function SetupRainbow(object)
+    task.spawn(function()
+        local hue = 0
+        while object and object.Parent do
+            hue = hue + 0.005
+            if hue > 1 then hue = 0 end
+            object.BackgroundColor3 = Color3.fromHSV(hue, 1, 1)
+            task.wait(0.05)
+        end
+    end)
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "InGameScreen"
+ScreenGui.Parent = game.CoreGui
+SetupRainbow(ScreenGui)
+
+-- หด UI ให้พอดี (ความสูง 150)
+local MainFrame = Instance.new("Frame")
+MainFrame.Parent = ScreenGui
+MainFrame.Size = UDim2.new(0, 200, 0, 150)
+MainFrame.Position = UDim2.new(0.5, -100, 0.5, -75)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 0, 0)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+Instance.new("UICorner", MainFrame)
+
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Text = "RSX SCRIPT"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.Font = Enum.Font.SpecialElite
+Title.TextSize = 18
+Title.BackgroundTransparency = 1
+
+-- ฟังก์ชันจัดการ Boombox
+local function HandleBoombox(state)
+    _G.BoomboxActive = state
+    if state then
+        -- ดึง Boombox มาถือทันที
+        for _, item in pairs(Player.Backpack:GetChildren()) do
+            if item.Name == "Boombox" then
+                item.Parent = Player.Character
+            end
+        end
+        
+        task.spawn(function()
+            while _G.BoomboxActive do
+                pcall(function()
+                    local char = Player.Character
+                    local tool = char:FindFirstChild("Boombox")
+                    
+                    if tool and tool:FindFirstChild("Handle") then
+                        tool.Handle.Massless = true
+                        tool.Handle.CanCollide = false
+                        
+                        local rightGrip = char:FindFirstChild("RightGrip", true)
+                        if rightGrip then rightGrip.Enabled = false end
+
+                        -- วาร์ปไปไว้ใต้เท้า
+                        tool.Handle.CFrame = char.HumanoidRootPart.CFrame * CFrame.new(0, -3, 0)
+                        
+                        -- ตัดอนิเมชั่นถือ
+                        for _, track in pairs(char.Humanoid:GetPlayingAnimationTracks()) do
+                            if track.Name == "ToolHold" or track.Name == "Hold" then
+                                track:Stop()
+                            end
+                        end
+                    end
+                end)
+                task.wait()
+            end
+        end)
+    end
+end
+
+-- ปุ่มควบคุม
+local BBBtn = Instance.new("TextButton", MainFrame)
+BBBtn.Size = UDim2.new(0.8, 0, 0, 40)
+BBBtn.Position = UDim2.new(0.1, 0, 0, 50)
+BBBtn.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
+BBBtn.Text = "Boombox: OFF"
+BBBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+BBBtn.Font = Enum.Font.SpecialElite
+Instance.new("UICorner", BBBtn)
+BBBtn.MouseButton1Click:Connect(function()
+    _G.BoomboxActive = not _G.BoomboxActive
+    BBBtn.Text = _G.BoomboxActive and "Boombox: ON" or "Boombox: OFF"
+    HandleBoombox(_G.BoomboxActive)
+end)
+
+local Footer = Instance.new("TextLabel", MainFrame)
+Footer.Size = UDim2.new(1, 0, 0, 30)
+Footer.Position = UDim2.new(0, 0, 0, 110)
+Footer.Text = "Development @000"
+Footer.TextColor3 = Color3.fromRGB(150, 150, 150)
+Footer.Font = Enum.Font.Code
+Footer.TextSize = 12
+Footer.BackgroundTransparency = 1
