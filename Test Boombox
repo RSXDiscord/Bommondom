@@ -1,110 +1,985 @@
--- [[ RSX SCRIPT by ffsww_1007 ]] --
-local Player = game.Players.LocalPlayer
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Remotes = ReplicatedStorage:WaitForChild("Remotes")
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local MarketplaceService = game:GetService("MarketplaceService")
 local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
 
--- ลบ UI เก่า
-if game.CoreGui:FindFirstChild("InGameScreen") then game.CoreGui.InGameScreen:Destroy() end
-if game.CoreGui:FindFirstChild("MoblieControls") then game.CoreGui.MoblieControls:Destroy() end
+-- [ ตารางสำหรับเก็บไอดีเพลงโปรดและเพลงแบล็กลิสต์ ]
+local SavedFavorites = {}
+local BlacklistedAudioIds = {} -- ตารางเก็บไอดีเพลงโดน Blacklist (ไม่ให้ดักเพลงนั้นๆ)
+local CurrentPreviewSound = nil -- ตัวแปรสำหรับทดลองฟังเพลง
+local ScriptLaunchTime = os.time() -- เวลาที่เริ่มเปิดใช้งานสคริปต์
 
-local function SetupRainbow(object)
-    task.spawn(function()
-        local hue = 0
-        while object and object.Parent do
-            hue = hue + 0.005
-            if hue > 1 then hue = 0 end
-            object.BackgroundColor3 = Color3.fromHSV(hue, 1, 1)
-            task.wait(0.05)
-        end
+-- [ ระบบเซฟและโหลดข้อมูลลงเครื่องอัตโนมัติ ]
+local SAVE_FILE_NAME = "RoSky_SaveData.json"
+
+local function SaveDataToDevice()
+    local data = {
+        Favorites = SavedFavorites,
+        Blacklist = BlacklistedAudioIds
+    }
+    local success, encoded = pcall(function()
+        return HttpService:JSONEncode(data)
     end)
-end
-
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "InGameScreen"
-ScreenGui.Parent = game.CoreGui
-SetupRainbow(ScreenGui)
-
--- หด UI ให้พอดี (ความสูง 150)
-local MainFrame = Instance.new("Frame")
-MainFrame.Parent = ScreenGui
-MainFrame.Size = UDim2.new(0, 200, 0, 150)
-MainFrame.Position = UDim2.new(0.5, -100, 0.5, -75)
-MainFrame.BackgroundColor3 = Color3.fromRGB(20, 0, 0)
-MainFrame.BorderSizePixel = 0
-MainFrame.Active = true
-MainFrame.Draggable = true
-Instance.new("UICorner", MainFrame)
-
-local Title = Instance.new("TextLabel", MainFrame)
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.Text = "RSX SCRIPT"
-Title.TextColor3 = Color3.fromRGB(255, 255, 255)
-Title.Font = Enum.Font.SpecialElite
-Title.TextSize = 18
-Title.BackgroundTransparency = 1
-
--- ฟังก์ชันจัดการ Boombox
-local function HandleBoombox(state)
-    _G.BoomboxActive = state
-    if state then
-        -- ดึง Boombox มาถือทันที
-        for _, item in pairs(Player.Backpack:GetChildren()) do
-            if item.Name == "Boombox" then
-                item.Parent = Player.Character
-            end
-        end
-        
-        task.spawn(function()
-            while _G.BoomboxActive do
-                pcall(function()
-                    local char = Player.Character
-                    local tool = char:FindFirstChild("Boombox")
-                    
-                    if tool and tool:FindFirstChild("Handle") then
-                        tool.Handle.Massless = true
-                        tool.Handle.CanCollide = false
-                        
-                        local rightGrip = char:FindFirstChild("RightGrip", true)
-                        if rightGrip then rightGrip.Enabled = false end
-
-                        -- วาร์ปไปไว้ใต้เท้า
-                        tool.Handle.CFrame = char.HumanoidRootPart.CFrame * CFrame.new(0, -3, 0)
-                        
-                        -- ตัดอนิเมชั่นถือ
-                        for _, track in pairs(char.Humanoid:GetPlayingAnimationTracks()) do
-                            if track.Name == "ToolHold" or track.Name == "Hold" then
-                                track:Stop()
-                            end
-                        end
-                    end
-                end)
-                task.wait()
-            end
+    if success then
+        pcall(function()
+            writefile(SAVE_FILE_NAME, encoded)
         end)
     end
 end
 
--- ปุ่มควบคุม
-local BBBtn = Instance.new("TextButton", MainFrame)
-BBBtn.Size = UDim2.new(0.8, 0, 0, 40)
-BBBtn.Position = UDim2.new(0.1, 0, 0, 50)
-BBBtn.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
-BBBtn.Text = "Boombox: OFF"
-BBBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-BBBtn.Font = Enum.Font.SpecialElite
-Instance.new("UICorner", BBBtn)
-BBBtn.MouseButton1Click:Connect(function()
-    _G.BoomboxActive = not _G.BoomboxActive
-    BBBtn.Text = _G.BoomboxActive and "Boombox: ON" or "Boombox: OFF"
-    HandleBoombox(_G.BoomboxActive)
+local function LoadDataFromDevice()
+    if isfile and isfile(SAVE_FILE_NAME) then
+        local success, content = pcall(function()
+            return readfile(SAVE_FILE_NAME)
+        end)
+        if success and content then
+            local decodedSuccess, decodedData = pcall(function()
+                return HttpService:JSONDecode(content)
+            end)
+            if decodedSuccess and decodedData then
+                if decodedData.Favorites then SavedFavorites = decodedData.Favorites end
+                if decodedData.Blacklist then BlacklistedAudioIds = decodedData.Blacklist end
+            end
+        end
+    end
+end
+
+-- โหลดข้อมูลที่เซฟไว้ก่อนเริ่มทำงาน
+LoadDataFromDevice()
+
+-- [ Setup ScreenGui ]
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "RoSky_NoOfficial_2026"
+ScreenGui.Parent = CoreGui
+ScreenGui.IgnoreGuiInset = true
+
+-- [ ฟังก์ชันสร้าง Tween เอนิเมชันสำหรับปุ่ม - แก้ไขบัคปุ่มเบี้ยว/เพี้ยนเมื่อกดซ้ำรัวๆ หรือนิ้วเลื่อนโดน ]
+local function ClickEffect(button)
+    local originalSize = button.Size -- ล็อกขนาดเริ่มต้นเอาไว้เพื่อป้องกันบัคขนาดเพี้ยน
+    button.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            TweenService:Create(button, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset - 4, originalSize.Y.Scale, originalSize.Y.Offset - 4)
+            }):Play()
+        end
+    end)
+    button.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            TweenService:Create(button, TweenInfo.new(0.1, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+                Size = originalSize
+            }):Play()
+        end
+    end)
+end
+
+-- [ ฟังก์ชันลากลื่น ]
+local function MakeDraggable(gui)
+    local dragging, dragInput, dragStart, startPos
+    local function update(input)
+        local delta = input.Position - dragStart
+        TweenService:Create(gui, TweenInfo.new(0.15, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+            Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        }):Play()
+    end
+    gui.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = gui.Position
+            
+            local connection
+            connection = input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then 
+                    dragging = false 
+                    connection:Disconnect()
+                end
+            end)
+        end
+    end)
+    gui.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then update(input) end
+    end)
+end
+
+-- [ ฟังก์ชันดึงข้อมูลเพลง (ชื่อเพลง, ผู้สร้าง, ปก) ]
+local function GetAudioInfo(audioId)
+    local success, assetInfo = pcall(function()
+        return MarketplaceService:GetProductInfo(tonumber(audioId))
+    end)
+    if success and assetInfo and assetInfo.AssetTypeId == 3 then
+        return assetInfo.Name, assetInfo.Creator.Name
+    end
+    return "Unknown Audio", "Unknown Creator"
+end
+
+-- [ Main Frame (Two-Tone Gradient Red/Dark) ]
+local Main = Instance.new("Frame", ScreenGui)
+Main.Size = UDim2.new(0, 310, 0, 210) 
+Main.Position = UDim2.new(0.5, -155, 0.5, -105)
+Main.BackgroundColor3 = Color3.fromRGB(12, 2, 2)
+Main.BorderSizePixel = 0
+Main.Active = true 
+Main.ClipsDescendants = true
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 8)
+
+local MainGradient = Instance.new("UIGradient", Main)
+MainGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(45, 2, 2)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(15, 0, 0)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(45, 2, 2))
+})
+MainGradient.Rotation = 45
+
+-- ระบบอนิเมชันคลื่นสองโทนขยับได้ (Animated Two-Tone Wave Effect)
+task.spawn(function()
+    local startTime = os.clock()
+    while true do
+        RunService.RenderStepped:Wait()
+        local t = os.clock() - startTime
+        MainGradient.Offset = Vector2.new(math.sin(t * 1.5) * 0.4, math.cos(t * 1.5) * 0.4)
+    end
 end)
 
-local Footer = Instance.new("TextLabel", MainFrame)
-Footer.Size = UDim2.new(1, 0, 0, 30)
-Footer.Position = UDim2.new(0, 0, 0, 110)
-Footer.Text = "Development @000"
-Footer.TextColor3 = Color3.fromRGB(150, 150, 150)
-Footer.Font = Enum.Font.Code
-Footer.TextSize = 12
-Footer.BackgroundTransparency = 1
+local Stroke = Instance.new("UIStroke", Main)
+Stroke.Color = Color3.fromRGB(180, 0, 0)
+Stroke.Thickness = 1.2
+
+-- [ Title - RoSky NoOfficial ]
+local Title = Instance.new("TextLabel", Main)
+Title.Size = UDim2.new(1, -70, 0, 30)
+Title.Position = UDim2.new(0, 10, 0, 0)
+Title.Text = "RoSky NoOfficial"
+Title.TextColor3 = Color3.fromRGB(255, 30, 30)
+Title.TextSize = 13
+Title.Font = Enum.Font.SpecialElite
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.BackgroundTransparency = 1
+
+-- [ ปุ่มย่อ UI (Minimize Button) ]
+local MiniBtn = Instance.new("TextButton", Main)
+MiniBtn.Size = UDim2.new(0, 25, 0, 25)
+MiniBtn.Position = UDim2.new(1, -60, 0, 3)
+MiniBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
+MiniBtn.Text = "−"
+MiniBtn.TextColor3 = Color3.fromRGB(255, 30, 30)
+MiniBtn.TextSize = 18
+MiniBtn.Font = Enum.Font.Code
+Instance.new("UICorner", MiniBtn).CornerRadius = UDim.new(0, 4)
+Instance.new("UIStroke", MiniBtn).Color = Color3.fromRGB(150, 0, 0)
+ClickEffect(MiniBtn)
+
+-- [ ปุ่ม 3 ขีด (Menu Button) ]
+local MenuBtn = Instance.new("TextButton", Main)
+MenuBtn.Size = UDim2.new(0, 25, 0, 25)
+MenuBtn.Position = UDim2.new(1, -30, 0, 3)
+MenuBtn.BackgroundColor3 = Color3.fromRGB(40, 5, 5)
+MenuBtn.Text = "≡"
+MenuBtn.TextColor3 = Color3.fromRGB(255, 0, 0)
+MenuBtn.TextSize = 18
+MenuBtn.Font = Enum.Font.Code
+Instance.new("UICorner", MenuBtn).CornerRadius = UDim.new(0, 4)
+Instance.new("UIStroke", MenuBtn).Color = Color3.fromRGB(150, 0, 0)
+ClickEffect(MenuBtn)
+
+-- [ Container สำหรับหน้าต่างๆ ]
+local PageContainer = Instance.new("Frame", Main)
+PageContainer.Size = UDim2.new(1, -20, 1, -40)
+PageContainer.Position = UDim2.new(0, 10, 0, 32)
+PageContainer.BackgroundTransparency = 1
+
+-- ฟังก์ชันเฟดและเปลี่ยนหน้าแบบมีอนิเมชั่น
+local function SwitchPage(targetPage)
+    for _, page in pairs(PageContainer:GetChildren()) do
+        if page:IsA("GuiObject") then
+            if page == targetPage then
+                page.Visible = true
+                page.Size = UDim2.new(1, 0, 0.8, 0)
+                TweenService:Create(page, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+                    Size = UDim2.new(1, 0, 1, 0)
+                }):Play()
+            else
+                page.Visible = false
+            end
+        end
+    end
+end
+
+-- ==========================================
+-- [ หน้าที่ 1: หน้าดักไอดีเพลง (Audio Page) ]
+-- ==========================================
+local AudioPage = Instance.new("ScrollingFrame", PageContainer)
+AudioPage.Size = UDim2.new(1, 0, 1, 0)
+AudioPage.BackgroundColor3 = Color3.fromRGB(18, 2, 2)
+AudioPage.BackgroundTransparency = 0.4
+AudioPage.BorderSizePixel = 0
+AudioPage.ScrollBarThickness = 3
+AudioPage.ScrollBarImageColor3 = Color3.fromRGB(255, 0, 0)
+AudioPage.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local AudioListLayout = Instance.new("UIListLayout", AudioPage)
+AudioListLayout.Padding = UDim.new(0, 5)
+
+-- ==========================================
+-- [ หน้าที่ 2: หน้าส่องคนมีกั้น (Boombox Users Page) ]
+-- ==========================================
+local BoomboxPage = Instance.new("ScrollingFrame", PageContainer)
+BoomboxPage.Size = UDim2.new(1, 0, 1, 0)
+BoomboxPage.BackgroundColor3 = Color3.fromRGB(18, 2, 2)
+BoomboxPage.BackgroundTransparency = 0.4
+BoomboxPage.BorderSizePixel = 0
+BoomboxPage.ScrollBarThickness = 3
+BoomboxPage.ScrollBarImageColor3 = Color3.fromRGB(255, 0, 0)
+BoomboxPage.Visible = false
+BoomboxPage.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local BoomboxListLayout = Instance.new("UIListLayout", BoomboxPage)
+BoomboxListLayout.Padding = UDim.new(0, 5)
+
+-- ==========================================
+-- [ หน้าที่ 3: หน้าแสดงรายการโปรดที่บันทึกไว้ (Fav Page) ]
+-- ==========================================
+local FavPage = Instance.new("ScrollingFrame", PageContainer)
+FavPage.Size = UDim2.new(1, 0, 1, 0)
+FavPage.BackgroundColor3 = Color3.fromRGB(15, 0, 15)
+FavPage.BackgroundTransparency = 0.4
+FavPage.BorderSizePixel = 0
+FavPage.ScrollBarThickness = 3
+FavPage.ScrollBarImageColor3 = Color3.fromRGB(255, 0, 255)
+FavPage.Visible = false
+FavPage.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local FavListLayout = Instance.new("UIListLayout", FavPage)
+FavListLayout.Padding = UDim.new(0, 5)
+
+-- ==========================================
+-- [ หน้าที่ 4: หน้าการจัดการแบล็กลิสต์ (Blacklist Page) ]
+-- ==========================================
+local BlacklistPage = Instance.new("ScrollingFrame", PageContainer)
+BlacklistPage.Size = UDim2.new(1, 0, 1, 0)
+BlacklistPage.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+BlacklistPage.BackgroundTransparency = 0.4
+BlacklistPage.BorderSizePixel = 0
+BlacklistPage.ScrollBarThickness = 3
+BlacklistPage.ScrollBarImageColor3 = Color3.fromRGB(200, 0, 0)
+BlacklistPage.Visible = false
+BlacklistPage.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local BlacklistListLayout = Instance.new("UIListLayout", BlacklistPage)
+BlacklistListLayout.Padding = UDim.new(0, 5)
+
+-- ==========================================
+-- [ หน้าที่ 5: หน้าโปรไฟล์และวันเวลาออนไลน์ (Profile Page) ]
+-- ==========================================
+local ProfilePage = Instance.new("Frame", PageContainer)
+ProfilePage.Size = UDim2.new(1, 0, 1, 0)
+ProfilePage.BackgroundColor3 = Color3.fromRGB(20, 5, 5)
+ProfilePage.BackgroundTransparency = 0.2
+ProfilePage.Visible = false
+Instance.new("UICorner", ProfilePage).CornerRadius = UDim.new(0, 6)
+Instance.new("UIStroke", ProfilePage).Color = Color3.fromRGB(150, 0, 0)
+
+local ProfileTitle = Instance.new("TextLabel", ProfilePage)
+ProfileTitle.Size = UDim2.new(1, 0, 0, 25)
+ProfileTitle.Text = "-- USER PROFILE & SYSTEM STATUS --"
+ProfileTitle.TextColor3 = Color3.fromRGB(255, 50, 50)
+ProfileTitle.Font = Enum.Font.Code
+ProfileTitle.TextSize = 11
+ProfileTitle.BackgroundTransparency = 1
+
+-- รูปตัวละครของผู้ใช้งานสคริปต์ (LocalPlayer Image)
+local ProfileImg = Instance.new("ImageLabel", ProfilePage)
+ProfileImg.Size = UDim2.new(0, 45, 0, 45)
+ProfileImg.Position = UDim2.new(0, 10, 0, 30)
+ProfileImg.BackgroundTransparency = 1
+pcall(function()
+    ProfileImg.Image = Players:GetUserThumbnailAsync(LP.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+end)
+Instance.new("UICorner", ProfileImg).CornerRadius = UDim.new(1, 0)
+Instance.new("UIStroke", ProfileImg).Color = Color3.fromRGB(255, 0, 0)
+
+local ProfileInfo = Instance.new("TextLabel", ProfilePage)
+ProfileInfo.Size = UDim2.new(1, -70, 1, -35)
+ProfileInfo.Position = UDim2.new(0, 65, 0, 30)
+ProfileInfo.Text = ""
+ProfileInfo.TextColor3 = Color3.fromRGB(230, 230, 230)
+ProfileInfo.Font = Enum.Font.Code
+ProfileInfo.TextSize = 9.5
+ProfileInfo.TextXAlignment = Enum.TextXAlignment.Left
+ProfileInfo.TextYAlignment = Enum.TextYAlignment.Top
+ProfileInfo.BackgroundTransparency = 1
+
+-- อัปเดตข้อมูลเวลาในหน้า Profile แบบ Realtime
+task.spawn(function()
+    while task.wait(1) do
+        if ProfilePage.Visible then
+            local diff = os.time() - ScriptLaunchTime
+            local hours = math.floor(diff / 3600)
+            local mins = math.floor((diff % 3600) / 60)
+            local secs = diff % 60
+            ProfileInfo.Text = "User: " .. LP.Name .. "\n"
+                .. "ID: " .. LP.UserId .. "\n"
+                .. "Account Age: " .. LP.AccountAge .. " Days\n"
+                .. "Client: " .. (identifyexecutor and identifyexecutor() or "Unknown") .. "\n"
+                .. "Session: " .. string.format("%02d:%02d:%02d", hours, mins, secs) .. "\n"
+                .. "Date: " .. os.date("%Y-%m-%d") .. " | " .. os.date("%H:%M:%S")
+        end
+    end
+end)
+
+-- ==========================================
+-- [ หน้าเจาะลึก/รหัสแยกคน (Code Details Page) ]
+-- ==========================================
+local DetailPage = Instance.new("Frame", PageContainer)
+DetailPage.Size = UDim2.new(1, 0, 1, 0)
+DetailPage.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
+DetailPage.Visible = false
+Instance.new("UICorner", DetailPage).CornerRadius = UDim.new(0, 4)
+
+local DetailTitle = Instance.new("TextLabel", DetailPage)
+DetailTitle.Size = UDim2.new(1, 0, 0, 20)
+DetailTitle.Text = "Junk / Code Details"
+DetailTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+DetailTitle.Font = Enum.Font.Code
+DetailTitle.TextSize = 10
+DetailTitle.BackgroundTransparency = 1
+
+local DetailScroll = Instance.new("ScrollingFrame", DetailPage)
+DetailScroll.Size = UDim2.new(1, -10, 1, -50)
+DetailScroll.Position = UDim2.new(0, 5, 0, 20)
+DetailScroll.BackgroundTransparency = 1
+DetailScroll.ScrollBarThickness = 2
+DetailScroll.ScrollBarImageColor3 = Color3.fromRGB(255, 0, 0)
+
+local DetailText = Instance.new("TextLabel", DetailScroll)
+DetailText.Size = UDim2.new(1, 0, 0, 1000)
+DetailText.Text = ""
+DetailText.TextColor3 = Color3.fromRGB(200, 0, 0)
+DetailText.TextSize = 8
+DetailText.Font = Enum.Font.Code
+DetailText.TextWrapped = true
+DetailText.TextXAlignment = Enum.TextXAlignment.Left
+DetailText.TextYAlignment = Enum.TextYAlignment.Top
+DetailText.BackgroundTransparency = 1
+
+local BackBtn = Instance.new("TextButton", DetailPage)
+BackBtn.Size = UDim2.new(0, 60, 0, 20)
+BackBtn.Position = UDim2.new(0.5, -30, 1, -24)
+BackBtn.BackgroundColor3 = Color3.fromRGB(100, 0, 0)
+BackBtn.Text = "Back"
+BackBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+BackBtn.Font = Enum.Font.Code
+BackBtn.TextSize = 10
+Instance.new("UICorner", BackBtn).CornerRadius = UDim.new(0, 3)
+ClickEffect(BackBtn)
+
+BackBtn.MouseButton1Click:Connect(function()
+    DetailPage.Visible = false
+    BoomboxPage.Visible = true
+end)
+
+-- ==========================================
+-- [ Sidebar แถบเมนูด้านข้าง ]
+-- ==========================================
+local Sidebar = Instance.new("Frame", Main)
+Sidebar.Size = UDim2.new(0, 75, 1, -30)
+Sidebar.Position = UDim2.new(1, 5, 0, 30) -- ซ่อนไว้ด้านขวาของขอบนอก
+Sidebar.BackgroundColor3 = Color3.fromRGB(15, 0, 0)
+Sidebar.BorderSizePixel = 0
+Instance.new("UIStroke", Sidebar).Color = Color3.fromRGB(120, 0, 0)
+
+local SideGradient = Instance.new("UIGradient", Sidebar)
+SideGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(25, 0, 0)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 0, 0))
+})
+
+local SidebarLayout = Instance.new("UIListLayout", Sidebar)
+SidebarLayout.Padding = UDim.new(0, 4)
+SidebarLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+local function CreateMenuIcon(txt, callback)
+    local btn = Instance.new("TextButton", Sidebar)
+    btn.Size = UDim2.new(1, -10, 0, 22)
+    btn.BackgroundColor3 = Color3.fromRGB(45, 5, 5)
+    btn.Text = txt
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.Code
+    btn.TextSize = 8
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    Instance.new("UIStroke", btn).Color = Color3.fromRGB(100, 0, 0)
+    ClickEffect(btn)
+    
+    btn.MouseButton1Click:Connect(callback)
+    return btn
+end
+
+local sidebarOpen = false
+local currentSidebarTween = nil -- เก็บค่าอนิเมชันเปิดปิดปัจจุบันเพื่อกันสแปมบัค
+local function ToggleSidebar()
+    sidebarOpen = not sidebarOpen
+    local targetX = sidebarOpen and UDim2.new(1, -75, 0, 30) or UDim2.new(1, 5, 0, 30)
+    if currentSidebarTween then currentSidebarTween:Cancel() end
+    currentSidebarTween = TweenService:Create(Sidebar, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = targetX})
+    currentSidebarTween:Play()
+end
+
+MenuBtn.MouseButton1Click:Connect(ToggleSidebar)
+
+CreateMenuIcon("MAIN GUI", function() SwitchPage(AudioPage) ToggleSidebar() end)
+CreateMenuIcon("BOOMBOX", function() SwitchPage(BoomboxPage) ToggleSidebar() end)
+CreateMenuIcon("FAVORITES", function() SwitchPage(FavPage) ToggleSidebar() end)
+CreateMenuIcon("BLACKLIST", function() SwitchPage(BlacklistPage) ToggleSidebar() end)
+CreateMenuIcon("PROFILE", function() SwitchPage(ProfilePage) ToggleSidebar() end)
+
+-- ==========================================
+-- [ ฟังก์ชันคัดลอกพร้อมเอฟเฟกต์อนิเมชั่น ]
+-- ==========================================
+local function CopyIdWithEffect(button, audioId)
+    setclipboard(tostring(audioId))
+    local originalText = button.Text
+    local originalColor = button.BackgroundColor3
+    local originalSize = button.Size
+    
+    button.Text = "COPIED"
+    button.BackgroundColor3 = Color3.fromRGB(0, 150, 0)
+    
+    -- เด้งปุ่มตอน Copy เสร็จ
+    TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(originalSize.X.Scale, originalSize.X.Offset + 6, originalSize.Y.Scale, originalSize.Y.Offset + 4)
+    }):Play()
+    
+    task.wait(0.15)
+    
+    TweenService:Create(button, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+        Size = originalSize
+    }):Play()
+    
+    task.delay(1, function()
+        button.Text = originalText
+        button.BackgroundColor3 = originalColor
+    end)
+end
+
+-- ==========================================
+-- [ ฟังก์ชันสำหรับทดลองเล่นเพลง ]
+-- ==========================================
+local function TogglePreviewAudio(audioId, playButton)
+    if CurrentPreviewSound and CurrentPreviewSound.SoundId == "rbxassetid://" .. audioId then
+        CurrentPreviewSound:Stop()
+        CurrentPreviewSound:Destroy()
+        CurrentPreviewSound = nil
+        playButton.Text = "►"
+        playButton.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+    else
+        if CurrentPreviewSound then
+            CurrentPreviewSound:Stop()
+            CurrentPreviewSound:Destroy()
+        end
+        
+        CurrentPreviewSound = Instance.new("Sound")
+        CurrentPreviewSound.SoundId = "rbxassetid://" .. audioId
+        CurrentPreviewSound.Volume = 1
+        CurrentPreviewSound.Parent = LP:WaitForChild("PlayerGui")
+        CurrentPreviewSound:Play()
+        
+        playButton.Text = "■"
+        playButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+        
+        CurrentPreviewSound.Ended:Connect(function()
+            playButton.Text = "►"
+            playButton.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+            if CurrentPreviewSound then CurrentPreviewSound:Destroy() end
+            CurrentPreviewSound = nil
+        end)
+    end
+end
+
+-- ฟังก์ชันสแกนซ้ำภายนอกเพื่อรีเฟรชการแสดงผล
+local Scan
+
+-- ==========================================
+-- [ Logic สำหรับหน้าจัดการแบล็กลิสต์ (แก้ไขใหม่: แสดงเฉพาะเพลงโดนแบล็กลิสต์) ]
+-- ==========================================
+local function UpdateBlacklistPage()
+    for _, v in pairs(BlacklistPage:GetChildren()) do if v:IsA("Frame") or v:IsA("TextLabel") then v:Destroy() end end
+    
+    -- แสดงหัวข้อหลัก
+    local BTitle = Instance.new("TextLabel", BlacklistPage)
+    BTitle.Size = UDim2.new(1, 0, 0, 15)
+    BTitle.Text = "--- BLACKLISTED AUDIOS ---"
+    BTitle.TextColor3 = Color3.fromRGB(255, 50, 50)
+    BTitle.Font = Enum.Font.Code
+    BTitle.TextSize = 8.5
+    BTitle.BackgroundTransparency = 1
+
+    local count = 0
+    for audioId, details in pairs(BlacklistedAudioIds) do
+        count = count + 1
+        local Card = Instance.new("Frame", BlacklistPage)
+        Card.Size = UDim2.new(1, -6, 0, 45)
+        Card.BackgroundColor3 = Color3.fromRGB(20, 5, 5)
+        Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 4)
+        
+        local CardGradient = Instance.new("UIGradient", Card)
+        CardGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(35, 5, 5)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 0, 0))
+        })
+
+        local AudioImg = Instance.new("ImageLabel", Card)
+        AudioImg.Size = UDim2.new(0, 35, 0, 35)
+        AudioImg.Position = UDim2.new(0, 5, 0, 5)
+        AudioImg.Image = "rbxthumb://type=Asset&id=" .. audioId .. "&w=150&h=150"
+        AudioImg.BackgroundTransparency = 1
+        Instance.new("UICorner", AudioImg).CornerRadius = UDim.new(0, 4)
+
+        local Info = Instance.new("TextLabel", Card)
+        Info.Size = UDim2.new(1, -115, 1, 0)
+        Info.Position = UDim2.new(0, 45, 0, 0)
+        Info.Text = (typeof(details) == "string" and details or "Banned Audio") .. "\nID: " .. audioId
+        Info.TextColor3 = Color3.fromRGB(200, 100, 100)
+        Info.TextSize = 8
+        Info.Font = Enum.Font.Code
+        Info.TextXAlignment = Enum.TextXAlignment.Left
+        Info.BackgroundTransparency = 1
+
+        local UnbanBtn = Instance.new("TextButton", Card)
+        UnbanBtn.Size = UDim2.new(0, 55, 0, 24)
+        UnbanBtn.Position = UDim2.new(1, -60, 0, 10.5)
+        UnbanBtn.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+        UnbanBtn.Text = "REMOVE"
+        UnbanBtn.TextColor3 = Color3.new(1, 1, 1)
+        UnbanBtn.Font = Enum.Font.Code
+        UnbanBtn.TextSize = 8
+        Instance.new("UICorner", UnbanBtn).CornerRadius = UDim.new(0, 4)
+        ClickEffect(UnbanBtn)
+
+        UnbanBtn.MouseButton1Click:Connect(function()
+            BlacklistedAudioIds[tostring(audioId)] = nil
+            SaveDataToDevice() -- บันทึกข้อมูลลงเครื่องทันทีเมื่อเปลี่ยนค่า
+            UpdateBlacklistPage()
+            Scan()
+        end)
+    end
+
+    if count == 0 then
+        local EmptyMsg = Instance.new("TextLabel", BlacklistPage)
+        EmptyMsg.Size = UDim2.new(1, 0, 0, 30)
+        EmptyMsg.Text = "No Blacklisted Audios"
+        EmptyMsg.TextColor3 = Color3.fromRGB(150, 150, 150)
+        EmptyMsg.Font = Enum.Font.Code
+        EmptyMsg.TextSize = 9
+        EmptyMsg.BackgroundTransparency = 1
+    end
+
+    BlacklistPage.CanvasSize = UDim2.new(0, 0, 0, BlacklistListLayout.AbsoluteContentSize.Y)
+end
+
+-- ==========================================
+-- [ Logic ฟังก์ชันสำหรับหน้าบันทึกรายการโปรด ]
+-- ==========================================
+local function UpdateFavPage()
+    for _, v in pairs(FavPage:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
+    
+    for audioId, creatorAndSong in pairs(SavedFavorites) do
+        local Card = Instance.new("Frame", FavPage)
+        Card.Size = UDim2.new(1, -6, 0, 45)
+        Card.BackgroundColor3 = Color3.fromRGB(30, 0, 30)
+        Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 4)
+
+        local CardGradient = Instance.new("UIGradient", Card)
+        CardGradient.Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(40, 5, 40)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 0, 15))
+        })
+
+        local AudioImg = Instance.new("ImageLabel", Card)
+        AudioImg.Size = UDim2.new(0, 35, 0, 35)
+        AudioImg.Position = UDim2.new(0, 5, 0, 5)
+        AudioImg.Image = "rbxthumb://type=Asset&id=" .. audioId .. "&w=150&h=150"
+        AudioImg.BackgroundTransparency = 1
+        Instance.new("UICorner", AudioImg).CornerRadius = UDim.new(0, 4)
+
+        local Info = Instance.new("TextLabel", Card)
+        Info.Size = UDim2.new(1, -155, 1, 0)
+        Info.Position = UDim2.new(0, 45, 0, 0)
+        Info.Text = creatorAndSong .. "\nID: " .. audioId
+        Info.TextColor3 = Color3.fromRGB(255, 200, 255)
+        Info.TextSize = 8
+        Info.Font = Enum.Font.Code
+        Info.TextXAlignment = Enum.TextXAlignment.Left
+        Info.BackgroundTransparency = 1
+
+        -- ปุ่มทดลองฟังเพลง (หน้าโปรด)
+        local PlayBtn = Instance.new("TextButton", Card)
+        PlayBtn.Size = UDim2.new(0, 24, 0, 24)
+        PlayBtn.Position = UDim2.new(1, -95, 0, 10.5)
+        PlayBtn.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+        PlayBtn.Text = "►"
+        PlayBtn.TextColor3 = Color3.new(1, 1, 1)
+        PlayBtn.Font = Enum.Font.Code
+        PlayBtn.TextSize = 10
+        Instance.new("UICorner", PlayBtn).CornerRadius = UDim.new(0, 4)
+        ClickEffect(PlayBtn)
+        PlayBtn.MouseButton1Click:Connect(function()
+            TogglePreviewAudio(audioId, PlayBtn)
+        end)
+
+        -- ปุ่มลบออกจากรายการโปรด (UNFAV)
+        local UnfavBtn = Instance.new("TextButton", Card)
+        UnfavBtn.Size = UDim2.new(0, 24, 0, 24)
+        UnfavBtn.Position = UDim2.new(1, -68, 0, 10.5)
+        UnfavBtn.BackgroundColor3 = Color3.fromRGB(150, 25, 25)
+        UnfavBtn.Text = "✖"
+        UnfavBtn.TextColor3 = Color3.new(1, 1, 1)
+        UnfavBtn.Font = Enum.Font.Code
+        UnfavBtn.TextSize = 9
+        Instance.new("UICorner", UnfavBtn).CornerRadius = UDim.new(0, 4)
+        ClickEffect(UnfavBtn)
+        UnfavBtn.MouseButton1Click:Connect(function()
+            SavedFavorites[audioId] = nil
+            SaveDataToDevice() -- บันทึกข้อมูลลงเครื่อง
+            UpdateFavPage()
+            Scan()
+        end)
+
+        local Copy = Instance.new("TextButton", Card)
+        Copy.Size = UDim2.new(0, 40, 0, 24)
+        Copy.Position = UDim2.new(1, -41, 0, 10.5)
+        Copy.BackgroundColor3 = Color3.fromRGB(120, 0, 120)
+        Copy.Text = "COPY"
+        Copy.TextColor3 = Color3.new(1, 1, 1)
+        Copy.Font = Enum.Font.Code
+        Copy.TextSize = 9
+        Instance.new("UICorner", Copy).CornerRadius = UDim.new(0, 3)
+        ClickEffect(Copy)
+
+        Copy.MouseButton1Click:Connect(function()
+            CopyIdWithEffect(Copy, audioId)
+        end)
+    end
+    FavPage.CanvasSize = UDim2.new(0, 0, 0, FavListLayout.AbsoluteContentSize.Y)
+end
+
+-- ==========================================
+-- [ Logic ดึงข้อมูลโค้ดจริงของผู้เล่นเมื่อ VIEW ]
+-- ==========================================
+local function GetActualPlayerDetails(targetPlayer)
+    local codeOutput = "-- [[ ROSKY SCANNER REPORT ]]\n"
+    codeOutput = codeOutput .. "Target_User: \"" .. targetPlayer.Name .. "\"\n"
+    codeOutput = codeOutput .. "Target_ID: " .. targetPlayer.UserId .. "\n"
+    codeOutput = codeOutput .. "Account_Age: " .. targetPlayer.AccountAge .. " Days\n\n"
+    
+    codeOutput = codeOutput .. "-- [[ DETECTED SOUND OBJECTS & CODES ]]\n"
+    local foundSound = false
+    
+    if targetPlayer.Character then
+        for _, s in pairs(targetPlayer.Character:GetDescendants()) do
+            if s:IsA("Sound") then
+                foundSound = true
+                local cleanId = s.SoundId:match("%d+") or "No ID"
+                codeOutput = codeOutput .. "Instance: " .. s:GetFullName() .. "\n"
+                codeOutput = codeOutput .. "└─ SoundId = \"rbxassetid://" .. cleanId .. "\"\n"
+                codeOutput = codeOutput .. "└─ Volume = " .. tostring(s.Volume) .. "\n"
+                codeOutput = codeOutput .. "└─ Playing = " .. tostring(s.IsPlaying) .. "\n\n"
+            end
+        end
+    end
+    
+    codeOutput = codeOutput .. "-- [[ BACKPACK INVENTORY CODES ]]\n"
+    for _, item in pairs(targetPlayer.Backpack:GetChildren()) do
+        if item:IsA("Tool") then
+            codeOutput = codeOutput .. "Found_Tool: Name = \"" .. item.Name .. "\" | Class = \"" .. item.ClassName .. "\"\n"
+            for _, sub in pairs(item:GetDescendants()) do
+                if sub:IsA("Script") or sub:IsA("LocalScript") then
+                    codeOutput = codeOutput .. "   └─ Attached_Script: \"" .. sub.Name .. "\"\n"
+                end
+            end
+        end
+    end
+    
+    if not foundSound then
+        codeOutput = codeOutput .. "\n-- [ALERT] No active audio stream found at this frame.\n"
+    end
+    
+    return codeOutput
+end
+
+-- สร้างการ์ดหน้าหลัก พร้อมเอนิเมชันขาเข้า
+local function CreateStealCard(targetPlayer, audioId)
+    local Card = Instance.new("Frame", AudioPage)
+    Card.Size = UDim2.new(1, -6, 0, 0)
+    Card.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
+    Card.ClipsDescendants = true
+    Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 5)
+
+    local CardGradient = Instance.new("UIGradient", Card)
+    CardGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(45, 5, 5)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 2, 2))
+    })
+
+    local AudioImg = Instance.new("ImageLabel", Card)
+    AudioImg.Size = UDim2.new(0, 40, 0, 40)
+    AudioImg.Position = UDim2.new(0, 5, 0, 5)
+    AudioImg.Image = "rbxthumb://type=Asset&id=" .. audioId .. "&w=150&h=150"
+    AudioImg.BackgroundTransparency = 1
+    Instance.new("UICorner", AudioImg).CornerRadius = UDim.new(0, 5)
+
+    local songName, songCreator = GetAudioInfo(audioId)
+
+    local Info = Instance.new("TextLabel", Card)
+    Info.Size = UDim2.new(1, -175, 1, 0)
+    Info.Position = UDim2.new(0, 50, 0, 0)
+    Info.Text = "Spotted: " .. targetPlayer.Name .. "\nMusic: " .. songName .. "\nBy: " .. songCreator .. "\nID: " .. audioId
+    Info.TextColor3 = Color3.fromRGB(235, 235, 235)
+    Info.TextSize = 7.5
+    Info.Font = Enum.Font.Code
+    Info.TextXAlignment = Enum.TextXAlignment.Left
+    Info.BackgroundTransparency = 1
+
+    -- ปุ่มกดเพิ่มเข้าตารางบัญชีดำเพลง (Audio ID Blacklist)
+    local AudioBlockBtn = Instance.new("TextButton", Card)
+    AudioBlockBtn.Size = UDim2.new(0, 20, 0, 24)
+    AudioBlockBtn.Position = UDim2.new(1, -142, 0, 13)
+    AudioBlockBtn.BackgroundColor3 = Color3.fromRGB(80, 10, 10)
+    AudioBlockBtn.Text = "🚫"
+    AudioBlockBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    AudioBlockBtn.Font = Enum.Font.Code
+    AudioBlockBtn.TextSize = 10
+    Instance.new("UICorner", AudioBlockBtn).CornerRadius = UDim.new(0, 4)
+    ClickEffect(AudioBlockBtn)
+    
+    AudioBlockBtn.MouseButton1Click:Connect(function()
+        BlacklistedAudioIds[tostring(audioId)] = songName .. " (" .. songCreator .. ")"
+        SaveDataToDevice() -- บันทึกข้อมูลลงเครื่อง
+        UpdateBlacklistPage()
+        
+        TweenService:Create(Card, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -6, 0, 0)}):Play()
+        task.wait(0.2)
+        Card:Destroy()
+        Scan()
+    end)
+
+    local SaveBtn = Instance.new("TextButton", Card)
+    SaveBtn.Size = UDim2.new(0, 24, 0, 24)
+    SaveBtn.Position = UDim2.new(1, -118, 0, 13)
+    SaveBtn.BackgroundColor3 = Color3.fromRGB(35, 0, 0)
+    SaveBtn.Text = "♡"
+    SaveBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
+    SaveBtn.Font = Enum.Font.Code
+    SaveBtn.TextSize = 14
+    Instance.new("UICorner", SaveBtn).CornerRadius = UDim.new(0, 4)
+    ClickEffect(SaveBtn)
+
+    SaveBtn.MouseButton1Click:Connect(function()
+        SavedFavorites[audioId] = songName .. " (" .. songCreator .. ")"
+        SaveDataToDevice() -- บันทึกข้อมูลลงเครื่อง
+        UpdateFavPage()
+        
+        TweenService:Create(Card, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -6, 0, 0)}):Play()
+        task.wait(0.2)
+        Card:Destroy()
+        AudioPage.CanvasSize = UDim2.new(0, 0, 0, AudioListLayout.AbsoluteContentSize.Y)
+    end)
+
+    local PlayBtn = Instance.new("TextButton", Card)
+    PlayBtn.Size = UDim2.new(0, 24, 0, 24)
+    PlayBtn.Position = UDim2.new(1, -90, 0, 13)
+    PlayBtn.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+    PlayBtn.Text = "►"
+    PlayBtn.TextColor3 = Color3.new(1, 1, 1)
+    PlayBtn.Font = Enum.Font.Code
+    PlayBtn.TextSize = 10
+    Instance.new("UICorner", PlayBtn).CornerRadius = UDim.new(0, 4)
+    ClickEffect(PlayBtn)
+
+    PlayBtn.MouseButton1Click:Connect(function()
+        TogglePreviewAudio(audioId, PlayBtn)
+    end)
+
+    local Copy = Instance.new("TextButton", Card)
+    Copy.Size = UDim2.new(0, 40, 0, 24)
+    Copy.Position = UDim2.new(1, -62, 0, 13)
+    Copy.BackgroundColor3 = Color3.fromRGB(130, 0, 0)
+    Copy.Text = "COPY"
+    Copy.TextColor3 = Color3.new(1, 1, 1)
+    Copy.Font = Enum.Font.Code
+    Copy.TextSize = 9
+    Instance.new("UICorner", Copy).CornerRadius = UDim.new(0, 3)
+    ClickEffect(Copy)
+
+    Copy.MouseButton1Click:Connect(function()
+        CopyIdWithEffect(Copy, audioId)
+    end)
+    
+    TweenService:Create(Card, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = UDim2.new(1, -6, 0, 50)}):Play()
+    AudioPage.CanvasSize = UDim2.new(0, 0, 0, AudioListLayout.AbsoluteContentSize.Y)
+end
+
+-- สร้างการ์ดรายชื่อหน้า Boombox
+local function CreateBoomboxUserCard(targetPlayer)
+    local Card = Instance.new("Frame", BoomboxPage)
+    Card.Size = UDim2.new(1, -6, 0, 40)
+    Card.BackgroundColor3 = Color3.fromRGB(35, 10, 10)
+    Instance.new("UICorner", Card).CornerRadius = UDim.new(0, 4)
+
+    local CardGradient = Instance.new("UIGradient", Card)
+    CardGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 10, 10)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(15, 2, 2))
+    })
+
+    local TargetImg = Instance.new("ImageLabel", Card)
+    TargetImg.Size = UDim2.new(0, 30, 0, 30)
+    TargetImg.Position = UDim2.new(0, 5, 0, 5)
+    pcall(function()
+        TargetImg.Image = Players:GetUserThumbnailAsync(targetPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size150x150)
+    end)
+    TargetImg.BackgroundTransparency = 1
+    Instance.new("UICorner", TargetImg).CornerRadius = UDim.new(1, 0)
+
+    local Info = Instance.new("TextLabel", Card)
+    Info.Size = UDim2.new(1, -85, 1, 0)
+    Info.Position = UDim2.new(0, 40, 0, 0)
+    Info.Text = targetPlayer.Name .. "\n[BOOMBOX DETECTED]"
+    Info.TextColor3 = Color3.fromRGB(255, 100, 100)
+    Info.TextSize = 9
+    Info.Font = Enum.Font.Code
+    Info.TextXAlignment = Enum.TextXAlignment.Left
+    Info.BackgroundTransparency = 1
+
+    local ViewBtn = Instance.new("TextButton", Card)
+    ViewBtn.Size = UDim2.new(0, 40, 0, 24)
+    ViewBtn.Position = UDim2.new(1, -45, 0, 8)
+    ViewBtn.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
+    ViewBtn.Text = "VIEW"
+    ViewBtn.TextColor3 = Color3.new(1, 1, 1)
+    ViewBtn.Font = Enum.Font.Code
+    ViewBtn.TextSize = 9
+    Instance.new("UICorner", ViewBtn).CornerRadius = UDim.new(0, 3)
+    ClickEffect(ViewBtn)
+
+    ViewBtn.MouseButton1Click:Connect(function()
+        BoomboxPage.Visible = false
+        DetailPage.Visible = true
+        
+        local realPlayerCode = GetActualPlayerDetails(targetPlayer)
+        DetailText.Text = realPlayerCode
+        DetailScroll.CanvasSize = UDim2.new(0, 0, 0, DetailText.TextBounds.Y + 20)
+    end)
+
+    BoomboxPage.CanvasSize = UDim2.new(0, 0, 0, BoomboxListLayout.AbsoluteContentSize.Y)
+end
+
+-- [ ฟังก์ชัน Auto Scan และระบบทะลุกั้นดักจับไอดีแบบลึก ]
+Scan = function()
+    for _, v in pairs(AudioPage:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
+    for _, v in pairs(BoomboxPage:GetChildren()) do if v:IsA("Frame") then v:Destroy() end end
+
+    for _, p in pairs(Players:GetPlayers()) do
+        -- ระบบเจาะทะลุสแกนแบบลึก (Deep Scans Characters & Backpacks เพื่อข้ามการพยายามบล็อก)
+        if p.Character then
+            for _, s in pairs(p.Character:GetDescendants()) do
+                if s:IsA("Sound") then
+                    local id = s.SoundId:match("%d+")
+                    -- ตรวจจับไอดี หากเจอรหัสความยาว 6 หลักขึ้นไปและไม่อยู่ใน blacklist/รายการโปรด
+                    if id and #id >= 6 and not SavedFavorites[id] and not BlacklistedAudioIds[tostring(id)] then 
+                        CreateStealCard(p, id) 
+                    end
+                end
+            end
+        end
+
+        -- ระบบดักจับไอดีเพลงจาก Backpack โดยตรง (กรณีมีคนซ่อน Sound ไว้ใน Tool หรือสวมบทกั้นไว้)
+        if p:FindFirstChild("Backpack") then
+            for _, tool in pairs(p.Backpack:GetChildren()) do
+                for _, s in pairs(tool:GetDescendants()) do
+                    if s:IsA("Sound") then
+                        local id = s.SoundId:match("%d+")
+                        if id and #id >= 6 and not SavedFavorites[id] and not BlacklistedAudioIds[tostring(id)] then
+                            CreateStealCard(p, id)
+                        end
+                    end
+                end
+            end
+        end
+        
+        local hasBoombox = p.Backpack:FindFirstChildOfClass("Tool") or (p.Character and p.Character:FindFirstChildOfClass("Tool"))
+        if hasBoombox or p == LP then 
+            CreateBoomboxUserCard(p)
+        end
+    end
+end
+
+-- ==========================================
+-- [ เพิ่มปุ่มสามเหลี่ยมย่อขนาด & ฟังก์ชันควบคุม ]
+-- ==========================================
+local TriangleBtn = Instance.new("TextButton", ScreenGui)
+TriangleBtn.Size = UDim2.new(0, 50, 0, 50)
+TriangleBtn.Position = UDim2.new(0.9, 0, 0.1, 0)
+TriangleBtn.BackgroundColor3 = Color3.fromRGB(20, 5, 5)
+TriangleBtn.BorderSizePixel = 0
+TriangleBtn.Text = "◀▶\n▼"
+TriangleBtn.TextColor3 = Color3.fromRGB(255, 30, 30)
+TriangleBtn.Font = Enum.Font.SpecialElite
+TriangleBtn.TextSize = 14
+TriangleBtn.Visible = false
+TriangleBtn.Active = true
+
+-- สร้างขอบสามเหลี่ยมแบบนีออน
+Instance.new("UICorner", TriangleBtn).CornerRadius = UDim.new(0, 25)
+local TriangleStroke = Instance.new("UIStroke", TriangleBtn)
+TriangleStroke.Color = Color3.fromRGB(255, 0, 0)
+TriangleStroke.Thickness = 2
+
+-- สกิลลากย้ายมุมสำหรับปุ่มสามเหลี่ยม
+MakeDraggable(TriangleBtn)
+
+local function MinimizeUI()
+    local hideTween = TweenService:Create(Main, TweenInfo.new(0.25, Enum.EasingStyle.Quart, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 0),
+        Position = UDim2.new(TriangleBtn.Position.X.Scale, TriangleBtn.Position.X.Offset, TriangleBtn.Position.Y.Scale, TriangleBtn.Position.Y.Offset)
+    })
+    hideTween:Play()
+    hideTween.Completed:Connect(function()
+        Main.Visible = false
+        TriangleBtn.Visible = true
+        local pulseIn = TweenService:Create(TriangleStroke, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {
+            Thickness = 4
+        })
+        pulseIn:Play()
+    end)
+end
+
+local function RestoreUI()
+    TriangleBtn.Visible = false
+    Main.Visible = true
+    TweenService:Create(Main, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 310, 0, 210),
+        Position = UDim2.new(0.5, -155, 0.5, -105)
+    }):Play()
+end
+
+MiniBtn.MouseButton1Click:Connect(MinimizeUI)
+TriangleBtn.MouseButton1Click:Connect(RestoreUI)
+
+-- เปิดใช้งานระบบทั้งหมด
+MakeDraggable(Main)
+UpdateFavPage()
+UpdateBlacklistPage()
+
+task.spawn(function()
+    while task.wait(2.5) do
+        Scan()
+    end
+end)
+
+Scan()
