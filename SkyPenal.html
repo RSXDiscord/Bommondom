@@ -1,0 +1,2053 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SKYPANEL - Wavacity Style Editor (Multi-Track)</title>
+<style>
+  :root{
+    --app-bg:#d6dade; --toolbar-bg:#eef1f3; --toolbar-border:#aab2b9;
+    --btn-bg:#ffffff; --btn-border:#9aa3ab; --btn-hover:#dbe6fb; --btn-active:#c3d6f7;
+    --text:#1b2226; --dim:#5c666d; --accent:#2f6fed;
+    --track-bg:#111417; --track-border:#e8c33a;
+    --wave-bg:#0a0c0e; --wave-line:#5470ff; --wave-line2:#8fa2ff;
+    --sel-bg:rgba(160,190,255,.16); --sel-border:#6f95ff;
+    --side-w:126px; --ruler-h:20px; --track-h:92px;
+  }
+  *{box-sizing:border-box;}
+  html,body{ margin:0; background:var(--app-bg); color:var(--text);
+    font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; font-size:13px;}
+  body{display:flex; flex-direction:column; min-height:100vh;}
+  svg{ display:block; }
+
+  /* ---------- Toolbars ---------- */
+  .toolbar{
+    display:flex; align-items:center; gap:6px; padding:6px 8px;
+    background:var(--toolbar-bg); border-bottom:1px solid var(--toolbar-border);
+    flex-wrap:wrap;
+  }
+  .brand{ font-weight:900; letter-spacing:.08em; color:var(--accent); font-size:13px; padding:0 8px 0 2px; }
+  button.tbtn{
+    background:var(--btn-bg); border:1px solid var(--btn-border); border-radius:6px;
+    width:34px; height:34px; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; padding:0; color:var(--text);
+  }
+  button.tbtn.wide{ width:auto; padding:0 10px; gap:6px; font-size:12px; }
+  button.tbtn:hover{ background:var(--btn-hover); }
+  button.tbtn:active{ background:var(--btn-active); }
+  button.tbtn:disabled{ opacity:.35; cursor:not-allowed; }
+  button.tbtn.on{ background:var(--btn-active); border-color:var(--accent); }
+  button.tbtn.recording{ background:#e0472c; border-color:#e0472c; color:#fff; animation: recPulse 1s infinite; }
+  @keyframes recPulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(224,71,44,.6);} 50%{ box-shadow:0 0 0 6px rgba(224,71,44,0);} }
+  .tsep{ width:1px; align-self:stretch; background:var(--toolbar-border); margin:2px 4px; }
+  input[type="file"]{ display:none; }
+
+  .meter-group{ display:flex; flex-direction:column; gap:2px; font-family:monospace; font-size:9px; color:var(--dim); }
+  .meter-row{ display:flex; align-items:center; gap:4px; }
+  .meter-bar{ width:150px; height:8px; background:#1c2126; border:1px solid #9aa3ab; border-radius:2px; overflow:hidden; position:relative; }
+  .meter-fill{ position:absolute; top:0; left:0; bottom:0; width:0%;
+    background:linear-gradient(90deg,#2fbf4f 0%,#2fbf4f 55%,#e6c33a 78%,#e0472c 92%); }
+
+  /* ---------- Track panel (multi-track, sticky header + sticky sidebar) ---------- */
+  .track-wrap{ padding:10px; flex:1; display:flex; flex-direction:column; min-height:0; }
+  .track-panel{ border:2px solid var(--track-border); border-radius:6px; overflow:hidden; display:flex; flex-direction:column; flex:1; min-height:0; }
+  #scrollWrap{ flex:1; overflow:auto; background:var(--wave-bg); position:relative; touch-action: pan-x pan-y; }
+  #content{ position:relative; display:flex; flex-direction:column; }
+
+  .ruler-row{ display:flex; position:sticky; top:0; z-index:6; height:var(--ruler-h); }
+  .ruler-corner{ position:sticky; left:0; z-index:7; width:var(--side-w); flex-shrink:0; background:var(--track-bg); border-right:1px solid #2a2f34; border-bottom:1px solid #2a2f34; }
+  #ruler{ display:block; height:var(--ruler-h); background:#151a1e; border-bottom:1px solid #2a2f34; }
+
+  .track-row{ display:flex; border-bottom:1px solid #23282d; }
+  .track-row.active-track .track-side{ box-shadow: inset 3px 0 0 0 var(--accent); }
+  .track-side{
+    position:sticky; left:0; z-index:4;
+    width:var(--side-w); flex-shrink:0; background:var(--track-bg); color:#e8ecef; padding:7px;
+    display:flex; flex-direction:column; gap:5px; border-right:1px solid #2a2f34;
+  }
+  .track-num{ display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%;
+    font-size:9px; font-weight:800; color:#0a0c0e; flex-shrink:0; cursor:grab; touch-action:none; }
+  .track-row.reordering{ outline:2px dashed #ffd23a; outline-offset:-2px; }
+  .track-row.reordering .track-side{ background:#1a1f24; }
+  .track-name-row{ display:flex; align-items:center; gap:5px; font-size:11px; font-weight:700; }
+  .track-name-row .tn{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+  .track-name-row .x{ cursor:pointer; color:#c65; flex-shrink:0; }
+  .track-fx-label{ font-size:9px; color:#7d8790; cursor:pointer; }
+  .track-fx-label.on{ color:#ffd23a; }
+  .ms-row{ display:flex; gap:4px; }
+  .ms-btn{ flex:1; background:#22262b; border:1px solid #3a4046; color:#cfd6db; border-radius:4px; padding:3px 0; font-size:10px; text-align:center; cursor:pointer; }
+  .ms-btn.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  .ms-btn.solo-on{ background:#e6c33a; color:#221; border-color:#e6c33a; }
+  .mini-slider{ display:flex; align-items:center; gap:4px; font-size:9px; }
+  .mini-slider input{ flex:1; width:100%; }
+  .track-meta{ font-size:9px; color:#98a1a8; line-height:1.3; }
+
+  .wave-cell{ position:relative; flex-shrink:0; height:var(--track-h); }
+  canvas.trackwave{ display:block; cursor:crosshair; touch-action:none; }
+
+  #selectionOverlay{ position:absolute; top:var(--ruler-h); bottom:0; background:var(--sel-bg);
+    border-left:1px solid var(--sel-border); border-right:1px solid var(--sel-border); pointer-events:none; display:none; z-index:2; }
+  #playhead{ position:absolute; top:0; bottom:0; width:2px; background:#ff5050; box-shadow:0 0 6px rgba(255,80,80,.9); pointer-events:none; z-index:3; }
+  .empty-hint{ position:absolute; inset:20px 0 0 0; display:flex; align-items:center; justify-content:center; color:#5c666d; font-size:12px; text-align:center; padding:0 20px; }
+
+  /* ---------- Bottom bar ---------- */
+  .bottombar{ display:flex; flex-wrap:wrap; gap:16px; align-items:center; padding:8px 12px;
+    background:var(--toolbar-bg); border-top:1px solid var(--toolbar-border); font-size:11px; }
+  .field{ display:flex; flex-direction:column; gap:2px; }
+  .field label{ color:var(--dim); font-size:10px; }
+  .field select, .field input.tfield{
+    background:#fff; border:1px solid var(--btn-border); border-radius:4px; padding:4px 6px; font-size:11px; color:var(--text);
+    font-family:monospace;
+  }
+  .sel-times{ display:flex; gap:6px; }
+  .sel-times input{ width:118px; }
+  .clock{ font-family:monospace; font-size:20px; letter-spacing:1px; color:var(--accent); background:#fff;
+    border:1px solid var(--btn-border); border-radius:6px; padding:4px 10px; }
+  .status{ margin-left:auto; color:var(--dim); font-size:11px; }
+
+  button.pill{ background:var(--btn-bg); border:1px solid var(--btn-border); border-radius:8px; padding:8px 14px; font-size:12px; cursor:pointer; color:var(--text); display:flex; align-items:center; gap:6px;}
+  button.pill:hover{ background:var(--btn-hover); }
+  button.pill.primary{ background:var(--accent); color:#fff; border-color:var(--accent); font-weight:700; }
+  button.pill:disabled{ opacity:.4; cursor:not-allowed; }
+
+  /* ---------- FX popup modals ---------- */
+  .fx-modal-backdrop{
+    position:fixed; inset:0; background:rgba(10,12,14,.55); z-index:70; display:none;
+    animation:fxFadeIn .15s ease;
+  }
+  .fx-modal-backdrop.show{ display:block; }
+  @keyframes fxFadeIn{ from{opacity:0;} to{opacity:1;} }
+
+  .fx-modal{
+    position:fixed; left:50%; bottom:0; transform:translate(-50%,0);
+    width:min(94vw,420px); max-height:82vh; overflow-y:auto;
+    background:var(--toolbar-bg); border:1px solid var(--toolbar-border); border-bottom:none;
+    border-radius:14px 14px 0 0; z-index:71; display:none; box-shadow:0 -6px 24px rgba(0,0,0,.25);
+  }
+  @media (min-width:520px){
+    .fx-modal{ bottom:auto; top:50%; transform:translate(-50%,-50%); border-radius:14px; border-bottom:1px solid var(--toolbar-border); }
+  }
+  .fx-modal.show{ display:block; animation:fxSlideUp .18s ease; }
+  @keyframes fxSlideUp{ from{opacity:0; transform:translate(-50%,10px);} to{opacity:1; transform:translate(-50%,0);} }
+  @media (min-width:520px){
+    .fx-modal.show{ animation:fxPop .16s ease; }
+    @keyframes fxPop{ from{opacity:0; transform:translate(-50%,-46%);} to{opacity:1; transform:translate(-50%,-50%);} }
+  }
+  .fx-modal-head{
+    display:flex; align-items:center; justify-content:space-between; padding:12px 14px;
+    border-bottom:1px solid var(--toolbar-border); font-size:12px; font-weight:800; letter-spacing:.04em;
+    color:var(--accent); text-transform:uppercase; position:sticky; top:0; background:var(--toolbar-bg); border-radius:14px 14px 0 0;
+  }
+  .fx-modal-head .sub{ font-size:9px; color:var(--dim); text-transform:none; letter-spacing:0; font-weight:600; }
+  .fx-close{ background:none; border:none; font-size:16px; cursor:pointer; color:var(--dim); line-height:1; padding:4px; }
+  .fx-close:hover{ color:var(--text); }
+  .fx-modal-body{ padding:14px; display:flex; flex-direction:column; gap:16px; }
+  .fx-hint{ font-size:10px; color:var(--dim); margin:0; line-height:1.5; }
+  .tune-presets{ display:flex; gap:6px; flex-wrap:wrap; }
+  .preset-btn{
+    flex:1; min-width:56px; background:#fff; border:1px solid var(--btn-border); border-radius:8px;
+    padding:7px 4px; font-size:10px; font-family:monospace; cursor:pointer; color:var(--text); text-align:center;
+  }
+  .preset-btn:hover{ background:var(--btn-hover); }
+  .preset-btn.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  .ctrl{ display:flex; flex-direction:column; gap:4px; }
+  .ctrl .row{ display:flex; justify-content:space-between; font-size:11px; }
+  .ctrl .row .val{ color:var(--accent); font-family:monospace; font-weight:700; }
+  input[type="range"]{ width:100%; accent-color:var(--accent); height:5px; }
+  .toggle-row{ display:flex; gap:8px; }
+  .fx-btn-title{ font-size:11px; font-weight:700; letter-spacing:.03em; color:var(--text); display:flex; align-items:center; gap:6px; }
+  .pitch-btn{ background:#fff; border:1px solid var(--btn-border); color:var(--dim); display:flex; align-items:center; justify-content:center; gap:5px; padding:7px 8px; font-size:10px; border-radius:6px; cursor:pointer; }
+  .pitch-btn:hover{ background:var(--btn-hover); }
+  .pitch-btn.on{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  .pitch-btn.ensemble-on{ background:#8a4fe0; border-color:#8a4fe0; color:#fff; }
+
+  #loading{ position:fixed; inset:0; background:rgba(10,12,14,.9); z-index:50; display:none; align-items:center; justify-content:center; flex-direction:column; gap:12px; }
+  #loading.show{ display:flex; }
+  .spin{ width:32px; height:32px; border:3px solid rgba(111,149,255,.25); border-top-color:var(--accent); border-radius:50%; animation:sp 1s linear infinite;}
+  @keyframes sp{ to{ transform:rotate(360deg);} }
+  .toast{ position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:#1b2226; border:1px solid var(--accent); color:#fff;
+    padding:8px 16px; border-radius:8px; font-size:12px; opacity:0; pointer-events:none; transition:opacity .25s; z-index:60; max-width:90vw; text-align:center; }
+  .toast.show{ opacity:1; }
+
+  .manual-save{ display:none; flex-direction:column; gap:6px; padding:10px; border:1px dashed var(--accent); border-radius:8px; background:#fff; }
+  .manual-save.show{ display:flex; }
+  .manual-save a{ color:var(--accent); font-weight:700; font-size:12px; word-break:break-all; }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="brand">SKYPANEL</span>
+  <div class="tsep"></div>
+  <button class="tbtn" id="btnPlay" title="Play/Pause" disabled></button>
+  <button class="tbtn" id="btnStop" title="Stop" disabled></button>
+  <button class="tbtn" id="btnSkipStart" title="Skip to start" disabled></button>
+  <button class="tbtn" id="btnSkipEnd" title="Skip to end" disabled></button>
+  <div class="tsep"></div>
+  <button class="tbtn wide" id="btnOpen" title="เพิ่มแทร็กใหม่จากไฟล์เสียง"></button>
+  <input type="file" id="fileInput" accept="audio/*">
+  <button class="tbtn" id="btnRecord" title="อัดเสียงเป็นแทร็กใหม่"></button>
+  <div class="tsep"></div>
+  <div class="meter-group">
+    <div class="meter-row"><span style="width:10px">L</span><div class="meter-bar"><div class="meter-fill" id="meterL"></div></div></div>
+    <div class="meter-row"><span style="width:10px">R</span><div class="meter-bar"><div class="meter-fill" id="meterR"></div></div></div>
+  </div>
+  <div class="tsep"></div>
+  <button class="tbtn" id="btnFullscreen" title="เต็มจอ + บังคับแนวนอน"></button>
+</div>
+
+<div class="toolbar">
+  <button class="tbtn" id="btnCut" title="Cut" disabled></button>
+  <button class="tbtn" id="btnCopy" title="Copy" disabled></button>
+  <button class="tbtn" id="btnPaste" title="Paste" disabled></button>
+  <button class="tbtn" id="btnDelete" title="Delete" disabled></button>
+  <button class="tbtn" id="btnTrim" title="Trim to selection" disabled></button>
+  <button class="tbtn" id="btnSelectMode" title="โหมดเลือกช่วงเสียง (ล็อก): ลากบนคลื่นเสียงจะเลือกช่วงเสมอ ไม่ไปตัด/ย้ายชิ้นเสียง — เปิดโหมดนี้ไว้เวลาจะเลือกช่วงเพื่อ Copy/Cut ให้แม่นยำ" disabled></button>
+  <button class="tbtn" id="btnSplitMode" title="โหมดตัดชิ้นเสียง: กดค้างบนคลื่นเสียงแล้วลากเพื่อ &quot;ตัด+ย้าย&quot; — ถ้าปิดโหมดนี้ กดค้างแล้วลากจะแค่ย้ายทั้งชิ้นเสียง ไม่ตัด (ปิดใช้งานอัตโนมัติเมื่อเปิดโหมดเลือกช่วง)" disabled></button>
+  <div class="tsep"></div>
+  <button class="tbtn" id="btnUndo" title="Undo" disabled></button>
+  <button class="tbtn" id="btnRedo" title="Redo" disabled></button>
+  <div class="tsep"></div>
+  <button class="tbtn" id="btnSelectAll" title="Select all" disabled></button>
+  <div class="tsep"></div>
+  <button class="tbtn" id="btnZoomIn" title="Zoom in" disabled></button>
+  <button class="tbtn" id="btnZoomOut" title="Zoom out" disabled></button>
+  <button class="tbtn" id="btnZoomSel" title="Zoom to selection" disabled></button>
+  <button class="tbtn" id="btnZoomFit" title="Zoom to fit" disabled></button>
+  <div class="tsep"></div>
+  <button class="tbtn" id="btnOpenGain" title="ความดัง / Gain (แทร็กที่เลือก)" disabled></button>
+  <button class="tbtn" id="btnOpenSpeed" title="ความเร็ว &amp; โทนเสียง (แทร็กที่เลือก)" disabled></button>
+  <button class="tbtn" id="btnOpenTune" title="จูนเสียง / Pitch Tune (แทร็กที่เลือก)" disabled></button>
+  <button class="tbtn" id="btnOpenChorus" title="Chorus / Ensemble (แทร็กที่เลือก)" disabled></button>
+  <button class="tbtn" id="btnOpenReverb" title="เสียงสะท้อน / Reverb (แทร็กที่เลือก)" disabled></button>
+  <button class="tbtn" id="btnOpenFade" title="ค่อยๆดังขึ้น / ค่อยๆเบาลง / Fade In-Out (แทร็กที่เลือก)" disabled></button>
+  <button class="tbtn" id="btnOpenExport" title="ส่งออกไฟล์ / Export (รวมทุกแทร็ก)" disabled></button>
+</div>
+
+<div class="track-wrap">
+  <div class="track-panel">
+    <div id="scrollWrap">
+      <div id="content">
+        <div class="ruler-row">
+          <div class="ruler-corner"></div>
+          <canvas id="ruler"></canvas>
+        </div>
+        <div id="tracksHost"></div>
+        <div id="selectionOverlay"></div>
+        <div id="playhead" style="left:0px;"></div>
+        <div class="empty-hint" id="emptyHint">เปิดไฟล์เสียงเพื่อเริ่มตัดต่อ — เพิ่มได้หลายแทร็กพร้อมกัน ลากบนคลื่นเสียงเพื่อเลือกช่วง หรือกดค้างบนคลื่นเสียงสักครู่แล้วลาก เพื่อตัดเสียงเป็นชิ้นแล้วย้ายตำแหน่งได้อิสระ หรือกดปุ่มไมค์เพื่ออัดเสียงเป็นแทร็กใหม่</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="bottombar">
+  <div class="field">
+    <label>Project Rate (Hz)</label>
+    <select id="rateSelect" title="ใช้ตอนส่งออกไฟล์ — เลือกคุณภาพ/ความละเอียดของไฟล์ที่ export ออกมา">
+      <option value="8000">8000 Hz</option>
+      <option value="16000">16000 Hz</option>
+      <option value="22050">22050 Hz</option>
+      <option value="24000">24000 Hz</option>
+      <option value="32000">32000 Hz</option>
+      <option value="44100">44100 Hz</option>
+      <option value="48000" selected>48000 Hz</option>
+      <option value="96000">96000 Hz</option>
+    </select>
+  </div>
+  <div class="field">
+    <label>Snap-To</label>
+    <select id="snapSelect"><option selected>Off</option><option>Seconds</option></select>
+  </div>
+  <div class="field">
+    <label>Start and End of Selection</label>
+    <div class="sel-times">
+      <input class="tfield" id="selStartField" value="00h00m00.000s">
+      <input class="tfield" id="selEndField" value="00h00m00.000s">
+    </div>
+  </div>
+  <div class="field">
+    <label>Playhead</label>
+    <div class="clock" id="clock">00h00m00s</div>
+  </div>
+  <div class="status" id="statusText">Stopped. <span id="activeTrackStatus"></span></div>
+</div>
+
+<!-- Popup backdrop shared by all FX modals -->
+<div class="fx-modal-backdrop" id="fxBackdrop"></div>
+
+<!-- Gain / Bass / Treble popup -->
+<div class="fx-modal" id="modalGain">
+  <div class="fx-modal-head"><span>ความดัง / Gain <span class="sub" id="gainModalTrackLabel"></span></span><button class="fx-close" data-close>✕</button></div>
+  <div class="fx-modal-body">
+    <div class="ctrl">
+      <div class="row"><label>Extra Gain</label><span class="val" id="volVal">0 dB</span></div>
+      <input type="range" id="volRange" min="-30" max="400" step="1" value="0">
+    </div>
+    <div class="ctrl">
+      <div class="row"><label>Bass EQ</label><span class="val" id="bassVal">0 dB</span></div>
+      <input type="range" id="bassRange" min="-20" max="40" step="1" value="0">
+    </div>
+    <div class="ctrl">
+      <div class="row"><label>Treble EQ</label><span class="val" id="trebleVal">0 dB</span></div>
+      <input type="range" id="trebleRange" min="-20" max="40" step="1" value="0">
+    </div>
+    <p class="fx-hint">ค่าเหล่านี้เป็นของแทร็กที่กำลังเลือกอยู่เท่านั้น (แตะที่แทร็กในรายการเพื่อเลือก)</p>
+  </div>
+</div>
+
+<!-- Speed / Pitch-lock / Chipmunk popup -->
+<div class="fx-modal" id="modalSpeed">
+  <div class="fx-modal-head"><span>ความเร็ว &amp; โทนเสียง <span class="sub" id="speedModalTrackLabel"></span></span><button class="fx-close" data-close>✕</button></div>
+  <div class="fx-modal-body">
+    <div class="ctrl">
+      <div class="row"><label>Speed</label><span class="val" id="speedVal">1.0x</span></div>
+      <input type="range" id="speedRange" min="0.5" max="2.0" step="0.05" value="1.0">
+    </div>
+    <button class="ms-btn pitch-btn" id="btnPitchLock" title="เร่งความเร็วโดยไม่เปลี่ยนโทนเสียง">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      <span id="pitchLabel">คงโทนเสียง: OFF</span>
+    </button>
+    <button class="ms-btn pitch-btn" id="btnChipmunk" title="กดปุ๊บได้เสียงชิบทันที ไม่ต้องลากสปีดเอง">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="6"/><path d="M8 8 6 5M16 8l2-3M9.5 13h.01M14.5 13h.01"/></svg>
+      <span id="chipmunkLabel">เสียงชิบ: OFF</span>
+    </button>
+    <p class="fx-hint">คงโทนเสียง = เร่ง/ลดสปีดโดยไม่เปลี่ยนคีย์เสียง (ใช้ได้เมื่อแทร็กนี้ยังไม่มีการตัดชิ้นเสียง) · เสียงชิบ = เร่งสปีด+คีย์สูงขึ้นทันที · ใช้ได้กับแทร็กที่เลือกอยู่เท่านั้น</p>
+  </div>
+</div>
+
+<!-- Pitch tune popup -->
+<div class="fx-modal" id="modalTune">
+  <div class="fx-modal-head"><span>จูนเสียง / Pitch Tune <span class="sub" id="tuneModalTrackLabel"></span></span><button class="fx-close" data-close>✕</button></div>
+  <div class="fx-modal-body">
+    <div class="ctrl">
+      <div class="row"><label>Pitch shift (semitone)</label><span class="val" id="tuneVal">0 st</span></div>
+      <input type="range" id="tuneRange" min="-12" max="12" step="1" value="0">
+    </div>
+    <div class="tune-presets" id="tunePresets">
+      <button class="preset-btn" data-st="-12">-1 Oct</button>
+      <button class="preset-btn" data-st="-7">-5th</button>
+      <button class="preset-btn" data-st="-3">-3rd</button>
+      <button class="preset-btn on" data-st="0">ปกติ</button>
+      <button class="preset-btn" data-st="3">+3rd</button>
+      <button class="preset-btn" data-st="7">+5th</button>
+      <button class="preset-btn" data-st="12">+1 Oct</button>
+    </div>
+    <p class="fx-hint">จูนคีย์เสียงแบบไม่เปลี่ยนความเร็ว — ใช้ได้ตอนปิด "คงโทนเสียง" ในเมนูความเร็ว · เฉพาะแทร็กที่เลือกอยู่</p>
+  </div>
+</div>
+
+<!-- Chorus / Ensemble popup -->
+<div class="fx-modal" id="modalChorus">
+  <div class="fx-modal-head"><span>Chorus / Ensemble <span class="sub" id="chorusModalTrackLabel"></span></span><button class="fx-close" data-close>✕</button></div>
+  <div class="fx-modal-body">
+    <div class="toggle-row">
+      <button class="ms-btn pitch-btn" id="btnChorusOn" style="flex:1;">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c2-4 4-4 6 0s4 4 6 0 4-4 6 0"/></svg>
+        <span id="chorusOnLabel">Ensemble: OFF</span>
+      </button>
+    </div>
+    <div class="ctrl">
+      <div class="row"><label>Rate (ความเร็วการโยกเสียง)</label><span class="val" id="chorusRateVal">1.2 Hz</span></div>
+      <input type="range" id="chorusRateRange" min="0.1" max="6" step="0.1" value="1.2">
+    </div>
+    <div class="ctrl">
+      <div class="row"><label>Depth (ความลึก)</label><span class="val" id="chorusDepthVal">6 ms</span></div>
+      <input type="range" id="chorusDepthRange" min="1" max="25" step="1" value="6">
+    </div>
+    <div class="ctrl">
+      <div class="row"><label>Mix (Wet/Dry)</label><span class="val" id="chorusMixVal">35%</span></div>
+      <input type="range" id="chorusMixRange" min="0" max="100" step="1" value="35">
+    </div>
+    <div class="ctrl">
+      <div class="row"><label>Voices (จำนวนชั้นเสียง)</label><span class="val" id="chorusVoicesVal">2</span></div>
+      <input type="range" id="chorusVoicesRange" min="1" max="3" step="1" value="2">
+    </div>
+    <p class="fx-hint">Ensemble/Chorus จะโยกระดับเสียงเบา ๆ ซ้อนกันหลายชั้น ทำให้เสียงหนาและกว้างขึ้นเหมือนมีคนร้อง/เล่นพร้อมกันหลายคน · ใช้ได้กับแทร็กที่เลือกอยู่ ทำงานตอนเล่นและตอน Export</p>
+  </div>
+</div>
+
+<!-- Reverb popup -->
+<div class="fx-modal" id="modalReverb">
+  <div class="fx-modal-head"><span>เสียงสะท้อน / Reverb <span class="sub" id="reverbModalTrackLabel"></span></span><button class="fx-close" data-close>✕</button></div>
+  <div class="fx-modal-body">
+    <div class="toggle-row">
+      <button class="ms-btn pitch-btn" id="btnReverbOn" style="flex:1;">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.4"/><path d="M8.5 12a3.5 3.5 0 0 1 3.5-3.5M8.5 12a3.5 3.5 0 0 0 3.5 3.5M16 12a7 7 0 0 0-7-7M16 12a7 7 0 0 1-7 7M19 12a10 10 0 0 0-10-10M19 12a10 10 0 0 1-10 10"/></svg>
+        <span id="reverbOnLabel">Reverb: OFF</span>
+      </button>
+    </div>
+    <div class="ctrl">
+      <div class="row"><label>Mix (Wet/Dry)</label><span class="val" id="reverbMixVal">30%</span></div>
+      <input type="range" id="reverbMixRange" min="0" max="100" step="1" value="30">
+    </div>
+    <div class="ctrl">
+      <div class="row"><label>Decay (ความยาวหางเสียง)</label><span class="val" id="reverbDecayVal">1.8 s</span></div>
+      <input type="range" id="reverbDecayRange" min="0.2" max="5" step="0.1" value="1.8">
+    </div>
+    <p class="fx-hint">Reverb จำลองเสียงสะท้อนในพื้นที่ ทำให้เสียงมีมิติและความลึกมากขึ้น เหมือนอยู่ในห้องโถงหรือคอนเสิร์ตฮอลล์ · ใช้ได้กับแทร็กที่เลือกอยู่ ทำงานตอนเล่นและตอน Export</p>
+  </div>
+</div>
+
+<!-- Fade In / Fade Out popup -->
+<div class="fx-modal" id="modalFade">
+  <div class="fx-modal-head"><span>ค่อยๆ ดังขึ้น / ค่อยๆ เบาลง <span class="sub" id="fadeModalTrackLabel"></span></span><button class="fx-close" data-close>✕</button></div>
+  <div class="fx-modal-body">
+    <div class="ctrl">
+      <div class="row"><label>เลื่อนเข้า (Fade In)</label><span class="val" id="fadeInVal">0.0 s</span></div>
+      <input type="range" id="fadeInRange" min="0" max="30" step="0.1" value="0">
+    </div>
+    <div class="ctrl">
+      <div class="row"><label>เลื่อนหาย (Fade Out)</label><span class="val" id="fadeOutVal">0.0 s</span></div>
+      <input type="range" id="fadeOutRange" min="0" max="30" step="0.1" value="0">
+    </div>
+    <p class="fx-hint">เลื่อนเข้า = ช่วงต้นของแทร็กจะค่อยๆ ดังขึ้นทีละนิดจนถึงระดับปกติ · เลื่อนหาย = ช่วงท้ายของแทร็กจะค่อยๆ เบาลงจนเงียบไปเอง · ใช้ได้กับแทร็กที่เลือกอยู่ ทำงานตอนเล่นและตอน Export</p>
+  </div>
+</div>
+
+<!-- Export popup: song/file name + format picker + reset -->
+<div class="fx-modal" id="modalExport">
+  <div class="fx-modal-head"><span>ส่งออกไฟล์ / Export (รวมทุกแทร็ก)</span><button class="fx-close" data-close>✕</button></div>
+  <div class="fx-modal-body">
+    <div class="ctrl">
+      <div class="row"><label>ชื่อไฟล์ / Song name</label></div>
+      <input type="text" id="exportName" class="tfield" placeholder="ชื่อไฟล์ (ไม่ใส่ก็ได้)" style="width:100%;">
+    </div>
+    <div class="ctrl">
+      <div class="row"><label>นามสกุลไฟล์ / Format</label></div>
+      <select id="exportFormat" style="width:100%;">
+        <option value="wav" selected>WAV</option>
+        <option value="mp3">MP3</option>
+        <option value="ogg">OGG (Opus)</option>
+        <option value="opus">Opus (.opus)</option>
+      </select>
+    </div>
+    <p class="fx-hint">คุณภาพ/ความละเอียดไฟล์ (Project Rate) ตั้งค่าได้ที่แถบด้านล่างคลื่นเสียง · ไฟล์ที่ export จะรวมทุกแทร็กที่ไม่ได้ Mute (หรือเฉพาะแทร็กที่ Solo ถ้ามี) ตามตำแหน่ง ความดัง และ FX ของแต่ละแทร็ก</p>
+    <div class="manual-save" id="manualSave">
+      <span style="font-size:11px;">ถ้าดาวน์โหลดไม่เริ่มอัตโนมัติ ให้กดลิงก์นี้ค้างไว้แล้วเลือก "บันทึกลิงก์ / Download link":</span>
+      <a id="manualSaveLink" href="#" target="_blank" rel="noopener"></a>
+    </div>
+    <div style="display:flex; gap:8px; justify-content:flex-end; padding-top:4px;">
+      <button class="pill" id="btnResetFx">Reset FX (แทร็กที่เลือก)</button>
+      <button class="pill primary" id="btnExport" disabled>Export</button>
+    </div>
+  </div>
+</div>
+
+<div id="loading"><div class="spin"></div><p style="font-size:12px;color:#ddd;" id="loadingText">Rendering export…</p></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.0/lame.min.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+
+  // ---------- Icon set (inline SVG, stroke-based, no emoji) ----------
+  const ICONS = {
+    play: `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`,
+    pause: `<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg>`,
+    stop: `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="1.5"/></svg>`,
+    skipStart: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zm3.5 7L19 5v14z"/></svg>`,
+    skipEnd: `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM5 5l9.5 7L5 19z"/></svg>`,
+    open: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`,
+    mic: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 19v3"/></svg>`,
+    cut: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.5 12 20 20M8.5 12 4 12"/></svg>`,
+    copy: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="1.5"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>`,
+    paste: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="17" rx="1.5"/><rect x="9" y="2" width="6" height="4" rx="1"/></svg>`,
+    trash: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-9 0 1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/></svg>`,
+    trim: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6v12M20 6v12M8 12h8"/></svg>`,
+    selectLock: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v6l6 6M4 4l16 16M14 4h6v6"/></svg>`,
+    splitMode: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="2.6"/><circle cx="6" cy="18" r="2.6"/><path d="M20 4 8 12l12 8M8 12H4"/></svg>`,
+    undo: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7 4 12l5 5M4 12h11a5 5 0 0 1 0 10h-1"/></svg>`,
+    redo: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 7l5 5-5 5M20 12H9a5 5 0 0 0 0 10h1"/></svg>`,
+    selectAll: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3 2"/></svg>`,
+    zoomIn: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.3 15.3 21 21M10.5 7.5v6M7.5 10.5h6"/></svg>`,
+    zoomOut: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.3 15.3 21 21M7.5 10.5h6"/></svg>`,
+    zoomSel: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h5M4 4v5M20 4h-5M20 4v5M4 20h5M4 20v-5M20 20h-5M20 20v-5"/></svg>`,
+    zoomFit: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 4H5a1 1 0 0 0-1 1v3M16 4h3a1 1 0 0 1 1 1v3M8 20H5a1 1 0 0 1-1-1v-3M16 20h3a1 1 0 0 0 1-1v-3"/></svg>`,
+    fullscreen: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V6a2 2 0 0 1 2-2h3M20 9V6a2 2 0 0 0-2-2h-3M4 15v3a2 2 0 0 0 2 2h3M20 15v3a2 2 0 0 1-2 2h-3"/></svg>`,
+    fullscreenExit: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4v3a2 2 0 0 1-2 2H4M15 4v3a2 2 0 0 0 2 2h3M9 20v-3a2 2 0 0 0-2-2H4M15 20v-3a2 2 0 0 1 2-2h3"/></svg>`,
+    gain: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v4h4l5 5V5l-5 5H3z"/><path d="M16 8a5 5 0 0 1 0 8M19 5a9 9 0 0 1 0 14"/></svg>`,
+    tone: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>`,
+    tune: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`,
+    chorus: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c2-4 4-4 6 0s4 4 6 0 4-4 6 0"/></svg>`,
+    reverb: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.2"/><path d="M8.5 12a3.5 3.5 0 0 1 3.5-3.5M8.5 12a3.5 3.5 0 0 0 3.5 3.5M16 12a7 7 0 0 0-7-7M16 12a7 7 0 0 1-7 7M19.3 12a10.3 10.3 0 0 0-10.3-10.3M19.3 12a10.3 10.3 0 0 1-10.3 10.3"/></svg>`,
+    fade: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17h3l3-10 3 10h3l3-10 3 10h1"/></svg>`,
+    exportIcon: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0-4-4m4 4 4-4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>`,
+    add: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`,
+  };
+  function setIcon(btn, name){ btn.innerHTML = ICONS[name]; }
+
+  setIcon($('btnPlay'),'play'); setIcon($('btnStop'),'stop');
+  setIcon($('btnSkipStart'),'skipStart'); setIcon($('btnSkipEnd'),'skipEnd');
+  $('btnOpen').innerHTML = ICONS.open + '<span>+ Track</span>';
+  setIcon($('btnRecord'),'mic');
+  setIcon($('btnCut'),'cut'); setIcon($('btnCopy'),'copy'); setIcon($('btnPaste'),'paste');
+  setIcon($('btnDelete'),'trash'); setIcon($('btnTrim'),'trim');
+  setIcon($('btnSelectMode'),'selectLock'); setIcon($('btnSplitMode'),'splitMode');
+  setIcon($('btnUndo'),'undo'); setIcon($('btnRedo'),'redo'); setIcon($('btnSelectAll'),'selectAll');
+  setIcon($('btnZoomIn'),'zoomIn'); setIcon($('btnZoomOut'),'zoomOut');
+  setIcon($('btnZoomSel'),'zoomSel'); setIcon($('btnZoomFit'),'zoomFit');
+  setIcon($('btnFullscreen'),'fullscreen');
+  setIcon($('btnOpenGain'),'gain');
+  setIcon($('btnOpenSpeed'),'tone');
+  setIcon($('btnOpenTune'),'tune');
+  setIcon($('btnOpenChorus'),'chorus');
+  setIcon($('btnOpenReverb'),'reverb');
+  setIcon($('btnOpenFade'),'fade');
+  setIcon($('btnOpenExport'),'exportIcon');
+
+  const fileInput = $('fileInput'), btnOpen = $('btnOpen'), btnRecord = $('btnRecord');
+  const btnPlay=$('btnPlay'), btnStop=$('btnStop'), btnSkipStart=$('btnSkipStart'), btnSkipEnd=$('btnSkipEnd');
+  const btnCut=$('btnCut'), btnCopy=$('btnCopy'), btnPaste=$('btnPaste'), btnDelete=$('btnDelete'), btnTrim=$('btnTrim');
+  const btnSelectMode=$('btnSelectMode');
+  const btnSplitMode=$('btnSplitMode');
+  const btnUndo=$('btnUndo'), btnRedo=$('btnRedo'), btnSelectAll=$('btnSelectAll');
+  const btnZoomOut=$('btnZoomOut'), btnZoomIn=$('btnZoomIn'), btnZoomSel=$('btnZoomSel'), btnZoomFit=$('btnZoomFit');
+  const btnResetFx=$('btnResetFx'), btnExport=$('btnExport'), exportFormat=$('exportFormat'), exportName=$('exportName');
+  const scrollWrap=$('scrollWrap'), content=$('content'), rulerC=$('ruler'), tracksHost=$('tracksHost');
+  const overlay=$('selectionOverlay'), playheadEl=$('playhead'), emptyHint=$('emptyHint');
+  const volRange=$('volRange'), volVal=$('volVal'), speedRange=$('speedRange'), speedVal=$('speedVal');
+  const bassRange=$('bassRange'), bassVal=$('bassVal'), trebleRange=$('trebleRange'), trebleVal=$('trebleVal');
+  const loading=$('loading'), loadingText=$('loadingText'), toastEl=$('toast');
+  const rCtx = rulerC.getContext('2d');
+  const selStartField=$('selStartField'), selEndField=$('selEndField'), clock=$('clock'), statusText=$('statusText'), activeTrackStatus=$('activeTrackStatus');
+  const meterL=$('meterL'), meterR=$('meterR');
+  const rateSelect=$('rateSelect'), snapSelect=$('snapSelect');
+  const btnFullscreen=$('btnFullscreen');
+  const manualSave=$('manualSave'), manualSaveLink=$('manualSaveLink');
+
+  // FX popup buttons/modals
+  const btnOpenGain=$('btnOpenGain'), btnOpenSpeed=$('btnOpenSpeed'), btnOpenTune=$('btnOpenTune'), btnOpenChorus=$('btnOpenChorus'), btnOpenExport=$('btnOpenExport');
+  const btnOpenReverb=$('btnOpenReverb'), btnOpenFade=$('btnOpenFade');
+  const modalGain=$('modalGain'), modalSpeed=$('modalSpeed'), modalTune=$('modalTune'), modalChorus=$('modalChorus'), modalExport=$('modalExport'), fxBackdrop=$('fxBackdrop');
+  const modalReverb=$('modalReverb'), modalFade=$('modalFade');
+  const tuneRange=$('tuneRange'), tuneVal=$('tuneVal'), tunePresets=$('tunePresets');
+  const chorusRateRange=$('chorusRateRange'), chorusRateVal=$('chorusRateVal');
+  const chorusDepthRange=$('chorusDepthRange'), chorusDepthVal=$('chorusDepthVal');
+  const chorusMixRange=$('chorusMixRange'), chorusMixVal=$('chorusMixVal');
+  const chorusVoicesRange=$('chorusVoicesRange'), chorusVoicesVal=$('chorusVoicesVal');
+  const btnChorusOn=$('btnChorusOn'), chorusOnLabel=$('chorusOnLabel');
+  const reverbMixRange=$('reverbMixRange'), reverbMixVal=$('reverbMixVal');
+  const reverbDecayRange=$('reverbDecayRange'), reverbDecayVal=$('reverbDecayVal');
+  const btnReverbOn=$('btnReverbOn'), reverbOnLabel=$('reverbOnLabel');
+  const fadeInRange=$('fadeInRange'), fadeInVal=$('fadeInVal');
+  const fadeOutRange=$('fadeOutRange'), fadeOutVal=$('fadeOutVal');
+
+  let audioCtx = null;
+
+  // ---------- Multi-track model ----------
+  let tracks = [];
+  let activeTrackId = null;
+  let _trackIdSeq = 1;
+  const nextTrackId = () => 't' + (_trackIdSeq++);
+  const TRACK_COLORS = ['#3ddc84','#5470ff','#e6c33a','#ff7a59','#c26bff','#39c7c7'];
+
+  let _clipIdSeq = 1;
+  const nextClipId = () => 'c' + (_clipIdSeq++);
+
+  let clipboard = null;
+  let selection = {start:0, end:0};
+  let selAnchor = 0;
+  let isSelecting = false;
+  let pxPerSec = 100;
+  let playhead = 0;
+  let isPlaying = false;
+  let splitDragMode = false;
+  let selectModeLock = false;
+
+  function getTrack(id){ return tracks.find(t=>t.id===id) || null; }
+  function activeTrack(){ return getTrack(activeTrackId); }
+  function makeDefaultTrack(buffer, name){
+    const num = tracks.length+1;
+    return {
+      id: nextTrackId(), name: name||'Track', num,
+      color: TRACK_COLORS[(num-1)%TRACK_COLORS.length],
+      clips: [{ id:nextClipId(), buffer, start:0 }],
+      gainDb:0, pan:0, mute:false, solo:false,
+      speed:1, pitchPreserve:false, chipmunk:false, pitchSemitones:0,
+      bassDb:0, trebleDb:0, extraGainDb:0,
+      chorus:{on:false, rate:1.2, depth:6, mix:35, voices:2},
+      reverb:{on:false, mix:30, decay:1.8},
+      fade:{fadeIn:0, fadeOut:0},
+      undoStack:[], redoStack:[],
+      sampleRate: buffer.sampleRate, numberOfChannels: buffer.numberOfChannels,
+      mediaBufferRef:null, mediaBlobUrl:null,
+    };
+  }
+
+  function renumberTracks(){
+    tracks.forEach((t,i)=>{ t.num = i+1; t.color = TRACK_COLORS[i % TRACK_COLORS.length]; });
+  }
+
+  function trackDuration(track){
+    return track.clips.length ? Math.max(...track.clips.map(c=>c.start+c.buffer.duration)) : 0;
+  }
+  function totalProjectDuration(){
+    return tracks.length ? Math.max(...tracks.map(trackDuration)) : 0;
+  }
+  function topClipAt(track, sec){
+    for(let i=track.clips.length-1;i>=0;i--){
+      const c = track.clips[i];
+      if(sec >= c.start && sec < c.start + c.buffer.duration) return c;
+    }
+    return null;
+  }
+  function cloneClipBufferRegion(buf, s, e){
+    const len = Math.max(1, e - s);
+    const out = audioCtx.createBuffer(buf.numberOfChannels, len, buf.sampleRate);
+    for(let ch=0; ch<buf.numberOfChannels; ch++) out.getChannelData(ch).set(buf.getChannelData(ch).subarray(s, e));
+    return out;
+  }
+  function splitClipAt(track, clip, atSec){
+    const localSec = atSec - clip.start;
+    const dur = clip.buffer.duration;
+    const edgeGuard = Math.min(0.15, dur*0.08);
+    if(localSec <= edgeGuard || (dur - localSec) <= edgeGuard){
+      return { left:null, right:clip, wholeMove:true };
+    }
+    const idx = track.clips.indexOf(clip);
+    const splitSample = Math.max(1, Math.min(clip.buffer.length-1, Math.round(localSec*clip.buffer.sampleRate)));
+    const left = { id:nextClipId(), buffer:cloneClipBufferRegion(clip.buffer,0,splitSample), start:clip.start };
+    const right = { id:nextClipId(), buffer:cloneClipBufferRegion(clip.buffer,splitSample,clip.buffer.length), start:clip.start + splitSample/clip.buffer.sampleRate };
+    if(idx>-1) track.clips.splice(idx,1,left,right); else track.clips.push(left,right);
+    return { left, right, wholeMove:false };
+  }
+  function compositeTrack(track){
+    if(!track.clips.length) return null;
+    const ref = track.clips[0].buffer;
+    const sr = ref.sampleRate, ch = Math.max(...track.clips.map(c=>c.buffer.numberOfChannels));
+    const len = Math.max(1, Math.round(trackDuration(track)*sr));
+    const out = audioCtx.createBuffer(ch, len, sr);
+    for(const clip of track.clips){
+      const startSample = Math.max(0, Math.round(clip.start*sr));
+      for(let c=0; c<ch; c++){
+        const src = clip.buffer.getChannelData(Math.min(c, clip.buffer.numberOfChannels-1));
+        const dst = out.getChannelData(c);
+        const n = Math.min(src.length, dst.length-startSample);
+        for(let i=0;i<n;i++){
+          let v = dst[startSample+i] + src[i];
+          if(v>1) v=1; else if(v<-1) v=-1;
+          dst[startSample+i] = v;
+        }
+      }
+    }
+    return out;
+  }
+  function commitTrackClips(track, newBuf){
+    track.clips = [{ id:nextClipId(), buffer:newBuf, start:0 }];
+  }
+  function cloneBufferRegion(buf, s, e){
+    const len = Math.max(1, e - s);
+    const out = audioCtx.createBuffer(buf.numberOfChannels, len, buf.sampleRate);
+    for(let ch=0; ch<buf.numberOfChannels; ch++) out.getChannelData(ch).set(buf.getChannelData(ch).subarray(s, e));
+    return out;
+  }
+  function removeRegion(buf, s, e){
+    const keepLen = Math.max(1, buf.length - (e - s));
+    const out = audioCtx.createBuffer(buf.numberOfChannels, keepLen, buf.sampleRate);
+    for(let ch=0; ch<buf.numberOfChannels; ch++){
+      const src = buf.getChannelData(ch), dst = out.getChannelData(ch);
+      dst.set(src.subarray(0,s),0); dst.set(src.subarray(e), s);
+    }
+    return out;
+  }
+  function insertRegion(buf, at, ins){
+    const out = audioCtx.createBuffer(buf.numberOfChannels, buf.length+ins.length, buf.sampleRate);
+    for(let ch=0; ch<buf.numberOfChannels; ch++){
+      const src = buf.getChannelData(ch);
+      const insD = ins.getChannelData(Math.min(ch, ins.numberOfChannels-1));
+      const dst = out.getChannelData(ch);
+      dst.set(src.subarray(0,at),0); dst.set(insD, at); dst.set(src.subarray(at), at+insD.length);
+    }
+    return out;
+  }
+  function pushUndo(track){
+    track.undoStack.push(track.clips.map(c=>({ id:c.id, buffer:c.buffer, start:c.start })));
+    if(track.undoStack.length>40) track.undoStack.shift();
+    track.redoStack=[];
+  }
+  function hasSelection(){ return (selection.end - selection.start) > 0.0005; }
+
+  // ---------- Toasts / format helpers ----------
+  function toast(msg, longer){
+    toastEl.textContent = msg; toastEl.classList.add('show');
+    clearTimeout(toastEl._t); toastEl._t = setTimeout(()=>toastEl.classList.remove('show'), longer ? 5000 : 1800);
+  }
+  function fmtLong(sec){
+    if(!isFinite(sec)) sec=0;
+    const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec - h*3600 - m*60;
+    return `${String(h).padStart(2,'0')}h${String(m).padStart(2,'0')}m${s.toFixed(3).padStart(6,'0')}s`;
+  }
+  function parseLong(str){
+    const m = str.match(/(\d+)h(\d+)m([\d.]+)s/);
+    if(!m) return null;
+    return (+m[1])*3600 + (+m[2])*60 + parseFloat(m[3]);
+  }
+  function ensureCtx(){ if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }
+  function effectiveRate(track){
+    const base = track.speed;
+    return track.chipmunk ? base * 1.6 : base;
+  }
+
+  // ---------- Fullscreen + forced landscape ----------
+  function isFullscreenNow(){ return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  async function enterFullscreenLandscape(){
+    const el = document.documentElement;
+    try{
+      if(el.requestFullscreen) await el.requestFullscreen();
+      else if(el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
+      else { toast('เบราว์เซอร์นี้ไม่รองรับโหมดเต็มจอ'); return; }
+    }catch(err){ toast('ไม่สามารถเข้าสู่โหมดเต็มจอได้'); return; }
+    try{ if(screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); }catch(err){}
+  }
+  async function exitFullscreenLandscape(){
+    try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(err){}
+    try{
+      if(document.exitFullscreen) await document.exitFullscreen();
+      else if(document.webkitExitFullscreen) await document.webkitExitFullscreen();
+    }catch(err){}
+  }
+  btnFullscreen.addEventListener('click', ()=>{ if(isFullscreenNow()) exitFullscreenLandscape(); else enterFullscreenLandscape(); });
+  function onFullscreenChange(){
+    const fs = isFullscreenNow();
+    btnFullscreen.classList.toggle('on', fs);
+    setIcon(btnFullscreen, fs ? 'fullscreenExit' : 'fullscreen');
+    btnFullscreen.title = fs ? 'ออกจากโหมดเต็มจอ' : 'เต็มจอ + บังคับแนวนอน';
+    if(!fs){ try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(err){} }
+  }
+  document.addEventListener('fullscreenchange', onFullscreenChange);
+  document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+
+  // ---------- File loading -> always adds a NEW track ----------
+  btnOpen.addEventListener('click', ()=>fileInput.click());
+  fileInput.addEventListener('change', async e=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    ensureCtx();
+    const arr = await file.arrayBuffer();
+    try{
+      const buf = await audioCtx.decodeAudioData(arr);
+      addTrackFromBuffer(buf, file.name);
+    }catch(err){ toast('ไม่สามารถอ่านไฟล์เสียงนี้ได้'); }
+    fileInput.value = '';
+  });
+
+  function addTrackFromBuffer(buf, name){
+    const track = makeDefaultTrack(buf, name || 'audio');
+    tracks.push(track);
+    renumberTracks();
+    activeTrackId = track.id;
+    selection = {start:0, end:0}; playhead = 0;
+    if(tracks.length===1) pxPerSec = Math.max(10, Math.min(400, (scrollWrap.clientWidth-126) / Math.max(0.1,buf.duration)));
+    setControlsEnabled(true);
+    updateEmptyState();
+    statusText.childNodes[0].textContent = 'Stopped. ';
+    renderTracksDOM();
+    refreshAll();
+    scrollWrap.scrollLeft = 0;
+  }
+
+  function updateEmptyState(){
+    const has = tracks.length>0;
+    emptyHint.style.display = has ? 'none' : 'flex';
+  }
+  function setControlsEnabled(on){
+    const anyTrack = tracks.length>0;
+    [btnPlay,btnStop,btnSkipStart,btnSkipEnd,btnSelectAll,btnZoomOut,btnZoomIn,btnZoomSel,btnZoomFit,btnExport,btnOpenExport].forEach(b=>b.disabled=!anyTrack);
+    const hasActive = !!activeTrack();
+    [btnCut,btnCopy,btnDelete,btnTrim,btnSelectMode,btnSplitMode,btnOpenGain,btnOpenSpeed,btnOpenTune,btnOpenChorus,btnOpenReverb,btnOpenFade].forEach(b=>b.disabled=!hasActive);
+    btnPaste.disabled = !(hasActive && clipboard);
+    updateUndoRedoButtons();
+  }
+  function updateUndoRedoButtons(){
+    const t = activeTrack();
+    btnUndo.disabled = !t || t.undoStack.length===0;
+    btnRedo.disabled = !t || t.redoStack.length===0;
+  }
+
+  function removeTrack(id){
+    stopAudio();
+    const idx = tracks.findIndex(t=>t.id===id);
+    if(idx<0) return;
+    tracks.splice(idx,1);
+    renumberTracks();
+    if(activeTrackId===id) activeTrackId = tracks.length ? tracks[Math.max(0,idx-1)].id : null;
+    if(!tracks.length){
+      selection = {start:0,end:0}; playhead=0;
+      setControlsEnabled(false);
+    }
+    updateEmptyState();
+    renderTracksDOM();
+    refreshAll();
+    toast('ปิดแทร็กแล้ว');
+  }
+
+  function setActiveTrack(id){
+    if(activeTrackId===id) return;
+    activeTrackId = id;
+    renderTracksDOM();
+    refreshFxModalFieldsFromActiveTrack();
+    setControlsEnabled(true);
+    refreshAll();
+  }
+
+  // ---------- Editing ops (act on active track) ----------
+  btnCopy.addEventListener('click', ()=>{
+    const t = activeTrack(); if(!t) return;
+    if(!hasSelection()) return toast('ยังไม่ได้เลือกช่วงเสียง');
+    const buf = compositeTrack(t); const sr = buf.sampleRate;
+    clipboard = cloneBufferRegion(buf, Math.round(selection.start*sr), Math.round(selection.end*sr));
+    btnPaste.disabled = false; toast('คัดลอกแล้ว (แทร็ก '+t.num+')');
+  });
+  btnCut.addEventListener('click', ()=>{
+    const t = activeTrack(); if(!t) return;
+    if(!hasSelection()) return toast('ยังไม่ได้เลือกช่วงเสียง — ลากบนคลื่นเสียงก่อน');
+    pushUndo(t);
+    const buf = compositeTrack(t); const sr = buf.sampleRate;
+    const s = Math.round(selection.start*sr), e = Math.round(selection.end*sr);
+    clipboard = cloneBufferRegion(buf, s, e); btnPaste.disabled=false;
+    const edited = removeRegion(buf, s, e);
+    commitTrackClips(t, edited);
+    playhead = selection.start; selection = {start:selection.start, end:selection.start};
+    afterEdit(t); toast('ตัดแล้ว');
+  });
+  btnDelete.addEventListener('click', ()=>{
+    const t = activeTrack(); if(!t) return;
+    if(!hasSelection()) return toast('ยังไม่ได้เลือกช่วงเสียง');
+    pushUndo(t);
+    const buf = compositeTrack(t); const sr = buf.sampleRate;
+    const s = Math.round(selection.start*sr), e = Math.round(selection.end*sr);
+    const edited = removeRegion(buf, s, e);
+    commitTrackClips(t, edited);
+    playhead = selection.start; selection = {start:selection.start, end:selection.start};
+    afterEdit(t); toast('ลบแล้ว');
+  });
+  btnPaste.addEventListener('click', ()=>{
+    const t = activeTrack(); if(!t || !clipboard) return;
+    pushUndo(t);
+    const buf = compositeTrack(t) || audioCtx.createBuffer(clipboard.numberOfChannels,1,clipboard.sampleRate);
+    const sr = buf.sampleRate;
+    const atSec = hasSelection() ? selection.start : playhead;
+    const at = Math.round(atSec*sr);
+    const edited = insertRegion(buf, Math.min(at,buf.length), clipboard);
+    commitTrackClips(t, edited);
+    const newDur = clipboard.length/sr;
+    selection = {start:atSec, end:atSec+newDur}; playhead = atSec+newDur;
+    afterEdit(t); toast('วางแล้ว');
+  });
+  btnTrim.addEventListener('click', ()=>{
+    const t = activeTrack(); if(!t) return;
+    if(!hasSelection()) return toast('ยังไม่ได้เลือกช่วงเสียง');
+    pushUndo(t);
+    const buf = compositeTrack(t); const sr = buf.sampleRate;
+    const s = Math.round(selection.start*sr), e = Math.round(selection.end*sr);
+    const edited = cloneBufferRegion(buf, s, e);
+    commitTrackClips(t, edited);
+    selection = {start:0, end:edited.length/sr}; playhead=0;
+    afterEdit(t); toast('ตัดขอบเหลือแค่ช่วงที่เลือกแล้ว');
+  });
+  btnUndo.addEventListener('click', ()=>{
+    const t = activeTrack(); if(!t || !t.undoStack.length) return;
+    t.redoStack.push(t.clips.map(c=>({ id:c.id, buffer:c.buffer, start:c.start })));
+    t.clips = t.undoStack.pop();
+    afterEdit(t);
+  });
+  btnRedo.addEventListener('click', ()=>{
+    const t = activeTrack(); if(!t || !t.redoStack.length) return;
+    t.undoStack.push(t.clips.map(c=>({ id:c.id, buffer:c.buffer, start:c.start })));
+    t.clips = t.redoStack.pop();
+    afterEdit(t);
+  });
+  btnSelectAll.addEventListener('click', ()=>{
+    if(!tracks.length) return;
+    selection = {start:0, end:totalProjectDuration()};
+    refreshOverlayAndStatus();
+  });
+  btnSelectMode.addEventListener('click', ()=>{
+    selectModeLock = !selectModeLock;
+    btnSelectMode.classList.toggle('on', selectModeLock);
+    if(selectModeLock && splitDragMode){
+      splitDragMode = false;
+      btnSplitMode.classList.remove('on');
+    }
+    btnSplitMode.disabled = selectModeLock || !activeTrack();
+    toast(selectModeLock
+      ? 'โหมดเลือกช่วง: เปิด — ลากบนคลื่นเสียงจะเลือกช่วงเสมอ ไม่ตัด/ย้ายชิ้นเสียง'
+      : 'โหมดเลือกช่วง: ปิด — กดค้างบนชิ้นเสียงแล้วลากจะย้าย/ตัดได้ตามปกติ');
+  });
+  btnSplitMode.addEventListener('click', ()=>{
+    if(selectModeLock) return;
+    splitDragMode = !splitDragMode;
+    btnSplitMode.classList.toggle('on', splitDragMode);
+    toast(splitDragMode
+      ? 'โหมดตัดชิ้นเสียง: เปิด — กดค้างบนคลื่นเสียงแล้วลาก จะตัดตรงจุดนั้นแล้วย้าย'
+      : 'โหมดตัดชิ้นเสียง: ปิด — กดค้างบนคลื่นเสียงแล้วลาก จะย้ายทั้งชิ้นเสียง ไม่ตัด');
+  });
+  function afterEdit(track){
+    stopAudio();
+    updateUndoRedoButtons();
+    refreshAll();
+  }
+
+  // ---------- Zoom ----------
+  btnZoomIn.addEventListener('click', ()=>{ pxPerSec = Math.min(2000, pxPerSec*1.6); refreshAll(); });
+  btnZoomOut.addEventListener('click', ()=>{ pxPerSec = Math.max(5, pxPerSec/1.6); refreshAll(); });
+  btnZoomFit.addEventListener('click', ()=>{
+    if(!tracks.length) return;
+    pxPerSec = Math.max(5, (scrollWrap.clientWidth-126) / Math.max(0.01,totalProjectDuration()));
+    refreshAll(); scrollWrap.scrollLeft = 0;
+  });
+  btnZoomSel.addEventListener('click', ()=>{
+    if(!hasSelection()) return toast('ยังไม่ได้เลือกช่วงเสียง');
+    const dur = selection.end - selection.start;
+    pxPerSec = Math.max(5, Math.min(2000, (scrollWrap.clientWidth-126) / dur));
+    refreshAll(); scrollWrap.scrollLeft = selection.start * pxPerSec;
+  });
+
+  // ---------- Track reordering (long-press the track number badge, then drag) ----------
+  let reorderTimer = null;
+  let reorderState = null; // {trackId}
+  const REORDER_LONG_PRESS_MS = 320, REORDER_CANCEL_PX = 10;
+
+  function attachReorderHandle(handle, t){
+    handle.addEventListener('pointerdown', e=>{
+      e.stopPropagation();
+      e.preventDefault();
+      setActiveTrack(t.id);
+      const startX = e.clientX, startY = e.clientY;
+      clearTimeout(reorderTimer);
+      reorderTimer = setTimeout(()=>{
+        reorderState = { trackId: t.id };
+        const rowEl = tracksHost.querySelector(`.track-row[data-track-id="${t.id}"]`);
+        if(rowEl) rowEl.classList.add('reordering');
+        toast('ลากขึ้น/ลง เพื่อสลับลำดับแทร็ก');
+      }, REORDER_LONG_PRESS_MS);
+
+      const onMove = ev=>{
+        if(!reorderState){
+          if(Math.abs(ev.clientX-startX) > REORDER_CANCEL_PX || Math.abs(ev.clientY-startY) > REORDER_CANCEL_PX){
+            clearTimeout(reorderTimer);
+          }
+          return;
+        }
+        if(reorderState.trackId !== t.id) return;
+        const rows = Array.from(tracksHost.querySelectorAll('.track-row'));
+        if(!rows.length) return;
+        let targetIdx = tracks.length-1;
+        for(let i=0;i<rows.length;i++){
+          const r = rows[i].getBoundingClientRect();
+          const mid = r.top + r.height/2;
+          if(ev.clientY < mid){ targetIdx = i; break; }
+        }
+        const curIdx = tracks.findIndex(tt=>tt.id===t.id);
+        if(targetIdx !== curIdx && curIdx>-1){
+          const [moved] = tracks.splice(curIdx,1);
+          tracks.splice(targetIdx,0,moved);
+          renumberTracks();
+          renderTracksDOM();
+          const newRow = tracksHost.querySelector(`.track-row[data-track-id="${t.id}"]`);
+          if(newRow) newRow.classList.add('reordering');
+        }
+        ev.preventDefault();
+      };
+      const onUp = ()=>{
+        clearTimeout(reorderTimer);
+        if(reorderState){
+          const rowEl = tracksHost.querySelector(`.track-row[data-track-id="${reorderState.trackId}"]`);
+          if(rowEl) rowEl.classList.remove('reordering');
+          reorderState = null;
+          toast('จัดลำดับแทร็กแล้ว');
+        }
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        window.removeEventListener('pointercancel', onUp);
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onUp);
+    });
+  }
+
+  // ---------- DOM building for tracks ----------
+  function renderTracksDOM(){
+    tracksHost.innerHTML = '';
+    for(const t of tracks){
+      const row = document.createElement('div');
+      row.className = 'track-row' + (t.id===activeTrackId ? ' active-track' : '');
+      row.dataset.trackId = t.id;
+
+      const side = document.createElement('div');
+      side.className = 'track-side';
+      const chorusOn = t.chorus.on;
+      side.innerHTML = `
+        <div class="track-name-row">
+          <span class="track-num" title="กดค้างแล้วลากขึ้น/ลง เพื่อสลับลำดับแทร็ก" style="background:${t.color}">${String(t.num).padStart(2,'0')}</span>
+          <span class="tn" title="${t.name}">${t.name}</span>
+          <span class="x" data-act="close" title="ปิดแทร็กนี้">✕</span>
+        </div>
+        <span class="track-fx-label ${chorusOn?'on':''}" data-act="openChorus">${chorusOn?'Chorus/Ensemble: ON':'+ Fx'}</span>
+        <div class="ms-row">
+          <div class="ms-btn ${t.mute?'on':''}" data-act="mute">Mute</div>
+          <div class="ms-btn ${t.solo?'solo-on':''}" data-act="solo">Solo</div>
+        </div>
+        <div class="mini-slider">
+          <span>Gain</span>
+          <input type="range" data-act="gain" min="-30" max="30" value="${t.gainDb}" step="1">
+        </div>
+        <div class="mini-slider">
+          <span>L</span>
+          <input type="range" data-act="pan" min="-1" max="1" value="${t.pan}" step="0.1">
+          <span>R</span>
+        </div>
+        <div class="track-meta">${t.numberOfChannels===1?'Mono':'Stereo'}, ${t.sampleRate}Hz</div>
+      `;
+      side.addEventListener('click', (e)=>{
+        const act = e.target.dataset.act;
+        if(act==='close'){ e.stopPropagation(); removeTrack(t.id); return; }
+        if(act==='openChorus'){ e.stopPropagation(); setActiveTrack(t.id); openFxModal(modalChorus); return; }
+        if(act==='mute'){ e.stopPropagation(); t.mute=!t.mute; renderTracksDOM(); if(isPlaying) playFromAll(playhead); return; }
+        if(act==='solo'){ e.stopPropagation(); t.solo=!t.solo; renderTracksDOM(); if(isPlaying) playFromAll(playhead); return; }
+        setActiveTrack(t.id);
+      });
+      side.querySelector('[data-act="gain"]').addEventListener('input', e=>{ t.gainDb=parseFloat(e.target.value); if(isPlaying) updateLiveTrackGain(t); });
+      side.querySelector('[data-act="pan"]').addEventListener('input', e=>{ t.pan=parseFloat(e.target.value); if(isPlaying) updateLiveTrackPan(t); });
+      attachReorderHandle(side.querySelector('.track-num'), t);
+
+      const waveCell = document.createElement('div');
+      waveCell.className = 'wave-cell';
+      const canvas = document.createElement('canvas');
+      canvas.className = 'trackwave';
+      canvas.dataset.trackId = t.id;
+      waveCell.appendChild(canvas);
+      attachWaveformPointerHandlers(canvas, t);
+
+      row.appendChild(side);
+      row.appendChild(waveCell);
+      tracksHost.appendChild(row);
+      t._canvas = canvas;
+    }
+    updateUndoRedoButtons();
+    const t = activeTrack();
+    activeTrackStatus.textContent = t ? ('| แทร็กที่เลือก: ' + String(t.num).padStart(2,'0') + ' ' + t.name) : '';
+  }
+
+  // ---------- Drawing ----------
+  function niceInterval(){
+    const options = [0.05,0.1,0.25,0.5,1,2,5,10,15,30,60,120,300,600];
+    for(const o of options){ if(o*pxPerSec >= 65) return o; }
+    return 600;
+  }
+  function refreshAll(){
+    const total = totalProjectDuration();
+    const availW = Math.max(0, scrollWrap.clientWidth - 126);
+    const width = Math.max(availW, Math.ceil(total * pxPerSec) + 20, 50);
+    rulerC.width = width; rulerC.height = 20; rulerC.style.width = width+'px';
+
+    rCtx.clearRect(0,0,width,20);
+    rCtx.fillStyle = '#151a1e'; rCtx.fillRect(0,0,width,20);
+    rCtx.strokeStyle = '#3a4046'; rCtx.fillStyle = '#9aa8b5'; rCtx.font='9px monospace';
+    const interval = niceInterval();
+    for(let t=0; t<=total+interval; t+=interval){
+      const x = t*pxPerSec;
+      rCtx.beginPath(); rCtx.moveTo(x,13); rCtx.lineTo(x,20); rCtx.stroke();
+      rCtx.fillText(t.toFixed(interval<1?2:0), x+3, 10);
+    }
+
+    for(const track of tracks){
+      const canvas = track._canvas;
+      if(!canvas) continue;
+      const waveHeight = 92;
+      canvas.width = width; canvas.height = waveHeight;
+      canvas.style.width = width+'px'; canvas.style.height = waveHeight+'px';
+      const wCtx = canvas.getContext('2d');
+      const mid = waveHeight/2;
+      wCtx.clearRect(0,0,width,waveHeight);
+      wCtx.fillStyle = '#0a0c0e'; wCtx.fillRect(0,0,width,waveHeight);
+      wCtx.strokeStyle = '#23282d'; wCtx.beginPath(); wCtx.moveTo(0,mid); wCtx.lineTo(width,mid); wCtx.stroke();
+      for(const clip of track.clips) drawClip(wCtx, track, clip, mid, waveHeight);
+    }
+
+    const contentHeight = 20 + tracks.length*92 + 46;
+    overlay.style.height = (contentHeight-20)+'px';
+    playheadEl.style.height = contentHeight+'px';
+    refreshOverlayAndStatus();
+  }
+  function drawClip(wCtx, track, clip, mid, waveHeight){
+    const x0 = clip.start*pxPerSec;
+    const w = Math.max(2, clip.buffer.duration*pxPerSec);
+
+    wCtx.fillStyle = clip===dragClip ? 'rgba(255,210,58,0.10)' : 'rgba(84,112,255,0.08)';
+    wCtx.fillRect(x0,2,w,waveHeight-4);
+    wCtx.strokeStyle = clip===dragClip ? '#ffd23a' : track.color;
+    wCtx.lineWidth = clip===dragClip ? 1.5 : 1;
+    wCtx.strokeRect(x0+0.5,2.5,Math.max(1,w-1),waveHeight-5);
+
+    const chans=[]; for(let c=0;c<clip.buffer.numberOfChannels;c++) chans.push(clip.buffer.getChannelData(c));
+    const totalSamples = clip.buffer.length;
+    const samplesPerPx = totalSamples / Math.max(1,w);
+    wCtx.strokeStyle = track.color; wCtx.lineWidth = 1;
+    wCtx.beginPath();
+    for(let px=0; px<w; px++){
+      const startS = Math.floor(px*samplesPerPx);
+      const endS = Math.min(totalSamples, Math.max(startS+1, Math.floor((px+1)*samplesPerPx)));
+      let min=1, max=-1;
+      const stride = Math.max(1, Math.floor((endS-startS)/200)||1);
+      for(let s=startS; s<endS; s+=stride){
+        let v=0; for(let c=0;c<chans.length;c++) v += chans[c][s]||0; v/=chans.length;
+        if(v<min) min=v; if(v>max) max=v;
+      }
+      if(min>max){min=0;max=0;}
+      const x = x0+px;
+      wCtx.moveTo(x, mid - max*(mid-6)); wCtx.lineTo(x, mid - min*(mid-6));
+    }
+    wCtx.stroke();
+  }
+  function refreshOverlayAndStatus(){
+    const s = selection.start, e = selection.end;
+    if(e - s > 0.0005 && tracks.length){
+      overlay.style.display = 'block';
+      overlay.style.left = (126 + s*pxPerSec)+'px';
+      overlay.style.width = ((e-s)*pxPerSec)+'px';
+    } else overlay.style.display = 'none';
+    playheadEl.style.left = (126 + playhead*pxPerSec)+'px';
+    selStartField.value = fmtLong(s);
+    selEndField.value = fmtLong(e);
+    clock.textContent = fmtLong(playhead).replace(/\.\d+s/,'s');
+  }
+
+  selStartField.addEventListener('change', ()=>{
+    const v = parseLong(selStartField.value);
+    if(v==null || !tracks.length) return;
+    selection.start = Math.max(0, Math.min(v, selection.end));
+    refreshOverlayAndStatus();
+  });
+  selEndField.addEventListener('change', ()=>{
+    const v = parseLong(selEndField.value);
+    if(v==null || !tracks.length) return;
+    selection.end = Math.min(totalProjectDuration(), Math.max(v, selection.start));
+    refreshOverlayAndStatus();
+  });
+
+  // ---------- Selection drag + long-press-to-split-and-move (per track canvas) ----------
+  let longPressTimer = null;
+  let dragMode = null; let dragClip = null, dragTrack=null, dragGrabOffset = 0;
+  let downClientX = 0, downClientY = 0;
+  let liveSec = 0;
+  const LONG_PRESS_MS = 380, MOVE_CANCEL_PX = 22;
+
+  function xToSec(canvas, clientX){
+    const rect = canvas.getBoundingClientRect();
+    const x = clientX - rect.left;
+    return Math.max(0, Math.min(totalProjectDuration(), x/pxPerSec));
+  }
+  function xToSecUnclamped(canvas, clientX){
+    const rect = canvas.getBoundingClientRect();
+    const x = clientX - rect.left;
+    return Math.max(0, x/pxPerSec);
+  }
+
+  function attachWaveformPointerHandlers(canvas, track){
+    canvas.addEventListener('pointerdown', e=>{
+      canvas.setPointerCapture(e.pointerId);
+      setActiveTrack(track.id);
+      downClientX = e.clientX; downClientY = e.clientY;
+      const downSec = xToSec(canvas, e.clientX);
+      liveSec = downSec;
+      const hitClip = topClipAt(track, downSec);
+      dragMode = null; dragClip = null; dragTrack = null;
+      selAnchor = downSec;
+      selection = {start:downSec, end:downSec};
+      playhead = downSec;
+      refreshOverlayAndStatus();
+      clearTimeout(longPressTimer);
+      // Select Mode lock: skip the long-press-to-move/split behavior entirely so a
+      // held drag never hijacks the selection — every drag on the waveform is a
+      // plain range selection, which makes Cut/Copy reliable.
+      if(hitClip && !selectModeLock){
+        longPressTimer = setTimeout(()=>{
+          // Use the latest known pointer position (not the stale pointerdown
+          // position) so the clip doesn't jump/lock to where the press started
+          // if the finger already moved a bit while we were waiting.
+          const grabSec = liveSec;
+          pushUndo(track);
+          let piece, grabOffset;
+          if(splitDragMode){
+            const res = splitClipAt(track, hitClip, grabSec);
+            if(res.wholeMove){ piece = res.right; grabOffset = grabSec - piece.start; }
+            else { piece = res.right; grabOffset = 0; }
+            toast(res.wholeMove ? 'กำลังย้ายชิ้นเสียง...' : 'ตัดแล้ว! ลากเพื่อย้ายชิ้นส่วน');
+          } else {
+            piece = hitClip; grabOffset = grabSec - hitClip.start;
+            toast('กำลังย้ายทั้งชิ้นเสียง (ไม่ตัด)...');
+          }
+          const idx = track.clips.indexOf(piece);
+          if(idx>-1){ track.clips.splice(idx,1); track.clips.push(piece); }
+          dragMode = 'move'; dragClip = piece; dragTrack = track; dragGrabOffset = grabOffset;
+          isSelecting = false;
+          overlay.style.display = 'none';
+          refreshAll();
+        }, LONG_PRESS_MS);
+      }
+      isSelecting = true;
+      e.preventDefault();
+    });
+    canvas.addEventListener('pointermove', e=>{
+      liveSec = xToSecUnclamped(canvas, e.clientX);
+      if(dragMode==='move' && dragClip){
+        const curSec = liveSec;
+        let newStart = Math.max(0, curSec - dragGrabOffset);
+        if(snapSelect.value==='Seconds') newStart = Math.round(newStart);
+        dragClip.start = newStart;
+        refreshAll();
+        e.preventDefault();
+        return;
+      }
+      if(Math.abs(e.clientX-downClientX) > MOVE_CANCEL_PX || Math.abs(e.clientY-downClientY) > MOVE_CANCEL_PX){
+        clearTimeout(longPressTimer);
+      }
+      if(!isSelecting) return;
+      const cur = xToSec(canvas, e.clientX);
+      selection = {start:Math.min(selAnchor,cur), end:Math.max(selAnchor,cur)};
+      refreshOverlayAndStatus();
+      e.preventDefault();
+    });
+  }
+  window.addEventListener('pointerup', ()=>{
+    clearTimeout(longPressTimer);
+    if(dragMode==='move'){
+      dragMode = null; dragClip = null; dragTrack = null;
+      refreshAll();
+      toast('ย้ายตำแหน่งแล้ว');
+    }
+    isSelecting = false;
+  });
+
+  // ---------- Chorus/Ensemble node builder (works for both realtime and offline contexts) ----------
+  function buildChorusChain(ctx, cfg){
+    const input = ctx.createGain();
+    const output = ctx.createGain();
+    const dryGain = ctx.createGain(); dryGain.gain.value = 1 - cfg.mix/100;
+    const wetGain = ctx.createGain(); wetGain.gain.value = cfg.mix/100;
+    input.connect(dryGain); dryGain.connect(output);
+    const voiceCount = Math.max(1, Math.min(3, Math.round(cfg.voices)));
+    const lfos = [];
+    for(let v=0; v<voiceCount; v++){
+      const delay = ctx.createDelay(0.06);
+      delay.delayTime.value = (cfg.depth/1000) * (1.1 + v*0.4);
+      const lfo = ctx.createOscillator(); lfo.type='sine';
+      lfo.frequency.value = cfg.rate * (1 + v*0.17);
+      const lfoGain = ctx.createGain(); lfoGain.gain.value = (cfg.depth/1000) * 0.9;
+      lfo.connect(lfoGain); lfoGain.connect(delay.delayTime);
+      lfo.start();
+      input.connect(delay); delay.connect(wetGain);
+      lfos.push(lfo);
+    }
+    wetGain.connect(output);
+    return { input, output, lfos, stop(){ for(const l of lfos){ try{l.stop();}catch(e){} } } };
+  }
+
+  // ---------- Reverb node builder (algorithmic convolution reverb, works realtime + offline) ----------
+  function buildReverbImpulse(ctx, decaySec){
+    const sr = ctx.sampleRate;
+    const length = Math.max(1, Math.floor(sr * Math.max(0.05, decaySec)));
+    const impulse = ctx.createBuffer(2, length, sr);
+    for(let ch=0; ch<2; ch++){
+      const data = impulse.getChannelData(ch);
+      for(let i=0;i<length;i++){
+        data[i] = (Math.random()*2-1) * Math.pow(1 - i/length, 2.2);
+      }
+    }
+    return impulse;
+  }
+  function buildReverbChain(ctx, cfg){
+    const input = ctx.createGain();
+    const output = ctx.createGain();
+    const dryGain = ctx.createGain(); dryGain.gain.value = 1 - cfg.mix/100;
+    const wetGain = ctx.createGain(); wetGain.gain.value = cfg.mix/100;
+    const convolver = ctx.createConvolver();
+    convolver.buffer = buildReverbImpulse(ctx, cfg.decay);
+    input.connect(dryGain); dryGain.connect(output);
+    input.connect(convolver); convolver.connect(wetGain); wetGain.connect(output);
+    return { input, output, convolver };
+  }
+
+  // ---------- Fade in/out envelope scheduler (shared by realtime playback + offline export) ----------
+  // ctxTimeAtStartSec: the AudioContext time that corresponds to playback position `startSec`.
+  // startSec: the timeline position (seconds, at speed=1) playback begins at.
+  // speed: track's effective playback rate (so real-world seconds = timeline-seconds / speed).
+  // dur: total duration (in timeline seconds) of the track.
+  function scheduleFadeEnvelope(gainNode, ctxTimeAtStartSec, startSec, speed, dur, fadeIn, fadeOut){
+    const g = gainNode.gain;
+    fadeIn = Math.max(0, fadeIn||0); fadeOut = Math.max(0, fadeOut||0);
+    g.cancelScheduledValues(ctxTimeAtStartSec);
+    if(fadeIn<=0 && fadeOut<=0){ g.setValueAtTime(1, ctxTimeAtStartSec); return; }
+    const toCtxTime = sec => ctxTimeAtStartSec + Math.max(0,(sec-startSec))/speed;
+    function valueAt(sec){
+      let v=1;
+      if(fadeIn>0 && sec < fadeIn) v = Math.min(v, Math.max(0,sec/fadeIn));
+      if(fadeOut>0 && sec > dur-fadeOut) v = Math.min(v, Math.max(0,(dur-sec)/fadeOut));
+      return Math.max(0, Math.min(1, v));
+    }
+    const startVal = valueAt(startSec);
+    g.setValueAtTime(startVal, ctxTimeAtStartSec);
+    if(fadeIn>0 && startSec < fadeIn){
+      g.linearRampToValueAtTime(1, toCtxTime(fadeIn));
+    }
+    if(fadeOut>0){
+      const foStart = dur - fadeOut;
+      if(startSec < foStart){
+        g.setValueAtTime(1, toCtxTime(foStart));
+      }
+      if(startSec < dur){
+        g.linearRampToValueAtTime(0, toCtxTime(dur));
+      }
+    }
+  }
+
+  // ---------- Realtime playback (mixes all tracks) ----------
+  let masterGain=null, masterSplitter=null, analyserL=null, analyserR=null;
+  let liveTrackChains = new Map();
+  let playStartCtxTime=0, playStartOffset=0, rafId=null, meterRafId=null, endTimer=null;
+
+  function computeTrackGainLinear(track){
+    const muted = anyTrackSoloed() ? !track.solo : track.mute;
+    if(muted) return 0;
+    const db = track.gainDb + track.extraGainDb;
+    return Math.min(Math.pow(10, db/20), 200);
+  }
+  function anyTrackSoloed(){ return tracks.some(t=>t.solo); }
+
+  function updateLiveTrackGain(track){
+    const chain = liveTrackChains.get(track.id);
+    if(chain && chain.gainNode) chain.gainNode.gain.value = computeTrackGainLinear(track);
+  }
+  function updateLiveTrackPan(track){
+    const chain = liveTrackChains.get(track.id);
+    if(chain && chain.panNode) chain.panNode.pan.value = track.pan;
+  }
+
+  function ensureMediaEl(track){ if(!track._mediaEl){ track._mediaEl = new Audio(); track._mediaEl.preload='auto'; } }
+  function encodeWav(buffer){
+    const numCh=buffer.numberOfChannels, sr=buffer.sampleRate, len=buffer.length;
+    const blockAlign=numCh*2, dataSize=len*blockAlign;
+    const bufOut = new ArrayBuffer(44+dataSize); const view = new DataView(bufOut);
+    function ws(off,str){ for(let i=0;i<str.length;i++) view.setUint8(off+i, str.charCodeAt(i)); }
+    ws(0,'RIFF'); view.setUint32(4,36+dataSize,true); ws(8,'WAVE');
+    ws(12,'fmt '); view.setUint32(16,16,true); view.setUint16(20,1,true);
+    view.setUint16(22,numCh,true); view.setUint32(24,sr,true);
+    view.setUint32(28,sr*blockAlign,true); view.setUint16(32,blockAlign,true); view.setUint16(34,16,true);
+    ws(36,'data'); view.setUint32(40,dataSize,true);
+    const channels=[]; for(let c=0;c<numCh;c++) channels.push(buffer.getChannelData(c));
+    let offset=44;
+    for(let i=0;i<len;i++) for(let c=0;c<numCh;c++){
+      let s=Math.max(-1,Math.min(1,channels[c][i]));
+      view.setInt16(offset, s<0? s*0x8000 : s*0x7fff, true); offset+=2;
+    }
+    return new Blob([bufOut],{type:'audio/wav'});
+  }
+  function refreshMediaSrcIfNeeded(track, buf){
+    if(track._mediaBufferRef !== buf){
+      if(track._mediaBlobUrl) URL.revokeObjectURL(track._mediaBlobUrl);
+      track._mediaBlobUrl = URL.createObjectURL(encodeWav(buf));
+      track._mediaEl.src = track._mediaBlobUrl;
+      track._mediaBufferRef = buf;
+    }
+  }
+
+  function buildMasterIfNeeded(){
+    if(masterGain) return;
+    masterGain = audioCtx.createGain(); masterGain.gain.value = 1;
+    masterSplitter = audioCtx.createChannelSplitter(2);
+    analyserL = audioCtx.createAnalyser(); analyserL.fftSize=512;
+    analyserR = audioCtx.createAnalyser(); analyserR.fftSize=512;
+    masterGain.connect(audioCtx.destination);
+    masterGain.connect(masterSplitter);
+    masterSplitter.connect(analyserL,0);
+    masterSplitter.connect(analyserR,1);
+  }
+
+  function stopSourceOnly(){
+    for(const [id,chain] of liveTrackChains){
+      for(const s of (chain.sources||[])){ try{s.stop();}catch(e){} try{s.disconnect();}catch(e){} }
+      if(chain.mediaEl){ try{ chain.mediaEl.pause(); }catch(e){} }
+      if(chain.mediaSourceNode){ try{ chain.mediaSourceNode.disconnect(); }catch(e){} }
+      if(chain.chorus){ chain.chorus.stop(); try{chain.chorus.input.disconnect();}catch(e){} }
+      if(chain.reverb){ try{chain.reverb.input.disconnect();}catch(e){} }
+      try{ if(chain.bassFilter) chain.bassFilter.disconnect(); }catch(e){}
+      try{ if(chain.trebleFilter) chain.trebleFilter.disconnect(); }catch(e){}
+      try{ if(chain.gainNode) chain.gainNode.disconnect(); }catch(e){}
+      try{ if(chain.envGain) chain.envGain.disconnect(); }catch(e){}
+      try{ if(chain.panNode) chain.panNode.disconnect(); }catch(e){}
+    }
+    liveTrackChains.clear();
+    clearTimeout(endTimer);
+    cancelAnimationFrame(rafId); cancelAnimationFrame(meterRafId);
+  }
+
+  function playFromAll(startSec){
+    ensureCtx();
+    if(audioCtx.state==='suspended') audioCtx.resume();
+    stopSourceOnly();
+    buildMasterIfNeeded();
+    const endLimit = hasSelection() ? selection.end : totalProjectDuration();
+    if(endLimit<=startSec+0.001){ return; }
+    let anyScheduled = false;
+    const startCtxTime = audioCtx.currentTime;
+
+    for(const track of tracks){
+      if(!track.clips.length) continue;
+      const muted = anyTrackSoloed() ? !track.solo : track.mute;
+      const speed = effectiveRate(track);
+      const panNode = (audioCtx.createStereoPanner ? audioCtx.createStereoPanner() : null);
+      const gainNode = audioCtx.createGain(); gainNode.gain.value = computeTrackGainLinear(track);
+      const envGain = audioCtx.createGain(); envGain.gain.value = 1;
+      const bassFilter = audioCtx.createBiquadFilter(); bassFilter.type='lowshelf'; bassFilter.frequency.value=200; bassFilter.gain.value=track.bassDb;
+      const trebleFilter = audioCtx.createBiquadFilter(); trebleFilter.type='highshelf'; trebleFilter.frequency.value=3000; trebleFilter.gain.value=track.trebleDb;
+      const chorus = track.chorus.on ? buildChorusChain(audioCtx, track.chorus) : null;
+      const reverb = track.reverb.on ? buildReverbChain(audioCtx, track.reverb) : null;
+      if(panNode) panNode.pan.value = track.pan;
+
+      const chain = { gainNode, envGain, panNode, bassFilter, trebleFilter, chorus, reverb, sources:[], mediaEl:null, mediaSourceNode:null };
+      liveTrackChains.set(track.id, chain);
+      if(muted){ gainNode.gain.value = 0; }
+
+      // Chain order: source -> [chorus] -> [reverb] -> bass -> treble -> gain -> fade envelope -> pan -> master
+      let entryNode = null, prevOutput = null;
+      for(const fx of [chorus, reverb]){
+        if(!fx) continue;
+        if(!entryNode) entryNode = fx.input;
+        if(prevOutput) prevOutput.connect(fx.input);
+        prevOutput = fx.output;
+      }
+      if(prevOutput) prevOutput.connect(bassFilter);
+      const preChain = entryNode || bassFilter;
+
+      bassFilter.connect(trebleFilter);
+      trebleFilter.connect(gainNode);
+      gainNode.connect(envGain);
+      if(panNode){ envGain.connect(panNode); panNode.connect(masterGain); }
+      else { envGain.connect(masterGain); }
+
+      const dur = trackDuration(track);
+      scheduleFadeEnvelope(envGain, startCtxTime, startSec, speed, dur, track.fade.fadeIn, track.fade.fadeOut);
+
+      if(track.pitchPreserve && track.clips.length===1){
+        ensureMediaEl(track);
+        refreshMediaSrcIfNeeded(track, track.clips[0].buffer);
+        if(!track._mediaSourceNode) track._mediaSourceNode = audioCtx.createMediaElementSource(track._mediaEl);
+        track._mediaSourceNode.disconnect();
+        track._mediaEl.preservesPitch = true; track._mediaEl.mozPreservesPitch = true; track._mediaEl.webkitPreservesPitch = true;
+        track._mediaEl.playbackRate = speed;
+        track._mediaEl.currentTime = Math.min(startSec, track.clips[0].buffer.duration);
+        track._mediaSourceNode.connect(preChain);
+        chain.mediaEl = track._mediaEl; chain.mediaSourceNode = track._mediaSourceNode;
+        if(!muted) track._mediaEl.play();
+        anyScheduled = true;
+      } else {
+        for(const clip of track.clips){
+          const clipEnd = clip.start + clip.buffer.duration;
+          if(clipEnd <= startSec || clip.start >= endLimit) continue;
+          const srcNode = audioCtx.createBufferSource();
+          srcNode.buffer = clip.buffer;
+          srcNode.playbackRate.value = speed;
+          if(srcNode.detune) srcNode.detune.value = track.pitchSemitones*100;
+          srcNode.connect(preChain);
+          let offsetInClip = 0, when = audioCtx.currentTime;
+          if(clip.start >= startSec) when = audioCtx.currentTime + (clip.start - startSec)/speed;
+          else offsetInClip = startSec - clip.start;
+          const untilEnd = Math.min(endLimit, clipEnd) - Math.max(startSec, clip.start);
+          try{ srcNode.start(when, offsetInClip); }catch(e){ continue; }
+          const stopAt = when + Math.max(0, untilEnd)/speed;
+          try{ srcNode.stop(stopAt); }catch(e){}
+          chain.sources.push(srcNode);
+          anyScheduled = true;
+        }
+      }
+    }
+    if(!anyScheduled){ return; }
+
+    playStartCtxTime = startCtxTime; playStartOffset = startSec;
+    isPlaying = true;
+    setIcon(btnPlay,'pause');
+    statusText.childNodes[0].textContent = 'Playing. ';
+    trackLoop(endLimit);
+    meterLoop();
+  }
+
+  let scrollFollowActive = false;
+  function trackLoop(endLimit){
+    if(!isPlaying) return;
+    const cur = playStartOffset + (audioCtx.currentTime - playStartCtxTime);
+    if(cur >= endLimit){ stopAudio(); return; }
+    playhead = cur;
+    refreshOverlayAndStatus();
+
+    const x = 126 + playhead*pxPerSec;
+    const viewW = scrollWrap.clientWidth;
+    const followX = viewW*0.3;
+    if(!scrollFollowActive && x > scrollWrap.scrollLeft + viewW - 30){ scrollFollowActive = true; }
+    if(scrollFollowActive){
+      const target = Math.max(0, x - followX - 126);
+      scrollWrap.scrollLeft = target;
+    }
+    rafId = requestAnimationFrame(()=>trackLoop(endLimit));
+  }
+
+  function meterLoop(){
+    if(!isPlaying || !analyserL) return;
+    const dataL = new Uint8Array(analyserL.fftSize), dataR = new Uint8Array(analyserR.fftSize);
+    analyserL.getByteTimeDomainData(dataL); analyserR.getByteTimeDomainData(dataR);
+    function peak(d){ let m=0; for(let i=0;i<d.length;i++){ const v=Math.abs(d[i]-128)/128; if(v>m) m=v; } return m; }
+    meterL.style.width = Math.min(100, peak(dataL)*100)+'%';
+    meterR.style.width = Math.min(100, peak(dataR)*100)+'%';
+    meterRafId = requestAnimationFrame(meterLoop);
+  }
+
+  function stopAudio(){
+    stopSourceOnly();
+    isPlaying = false; scrollFollowActive = false;
+    setIcon(btnPlay,'play');
+    statusText.childNodes[0].textContent = 'Stopped. ';
+    meterL.style.width='0%'; meterR.style.width='0%';
+    playhead = hasSelection() ? selection.start : playhead;
+    refreshOverlayAndStatus();
+  }
+
+  btnPlay.addEventListener('click', ()=>{
+    if(!tracks.length) return;
+    if(isPlaying){ stopAudio(); return; }
+    playFromAll(hasSelection() ? selection.start : playhead);
+  });
+  btnStop.addEventListener('click', ()=>{ stopAudio(); playhead = hasSelection() ? selection.start : 0; refreshOverlayAndStatus(); });
+  btnSkipStart.addEventListener('click', ()=>{ stopAudio(); playhead=0; refreshOverlayAndStatus(); scrollWrap.scrollLeft=0; });
+  btnSkipEnd.addEventListener('click', ()=>{ stopAudio(); playhead=totalProjectDuration(); refreshOverlayAndStatus(); scrollWrap.scrollLeft=content.offsetWidth; });
+
+  // ---------- Recording -> always a NEW track ----------
+  let isRecording = false;
+  let mediaRecorder = null, recChunks = [], micStream = null, recStartTime = 0, recTimerInterval = null;
+
+  async function toggleRecording(){
+    if(isRecording){ stopRecording(); return; }
+    await startRecording();
+  }
+  async function startRecording(){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      toast('เบราว์เซอร์นี้ไม่รองรับการอัดเสียง'); return;
+    }
+    try{ micStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+    catch(err){ toast('ไม่สามารถเข้าถึงไมโครโฟนได้ — ตรวจสอบสิทธิ์อนุญาต'); return; }
+    ensureCtx();
+    recChunks = [];
+    try{ mediaRecorder = new MediaRecorder(micStream); }
+    catch(err){ toast('ไม่สามารถเริ่มอัดเสียงได้'); micStream.getTracks().forEach(t=>t.stop()); return; }
+    mediaRecorder.ondataavailable = e => { if(e.data && e.data.size>0) recChunks.push(e.data); };
+    mediaRecorder.onstop = onRecordingStop;
+    mediaRecorder.start();
+    isRecording = true;
+    recStartTime = performance.now();
+    btnRecord.classList.add('recording');
+    btnRecord.title = 'Stop recording';
+    setIcon(btnRecord,'stop');
+    const fmtShort = sec=>{ const m=Math.floor(sec/60), s=sec-m*60; return `${String(m).padStart(2,'0')}:${s.toFixed(1).padStart(4,'0')}`; };
+    statusText.childNodes[0].textContent = 'Recording... 00:00.0 ';
+    clearInterval(recTimerInterval);
+    recTimerInterval = setInterval(()=>{
+      const el = (performance.now() - recStartTime)/1000;
+      statusText.childNodes[0].textContent = 'Recording... ' + fmtShort(el) + ' ';
+    }, 150);
+    toast('เริ่มอัดเสียงจากไมโครโฟน (จะเพิ่มเป็นแทร็กใหม่)');
+  }
+  function stopRecording(){
+    if(mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+    if(micStream) micStream.getTracks().forEach(t=>t.stop());
+    isRecording = false;
+    btnRecord.classList.remove('recording');
+    btnRecord.title = 'อัดเสียงเป็นแทร็กใหม่';
+    setIcon(btnRecord,'mic');
+    clearInterval(recTimerInterval);
+  }
+  async function onRecordingStop(){
+    statusText.childNodes[0].textContent = 'Decoding recording... ';
+    if(!recChunks.length){ statusText.childNodes[0].textContent='Stopped. '; return; }
+    const blob = new Blob(recChunks, { type: (mediaRecorder && mediaRecorder.mimeType) || 'audio/webm' });
+    recChunks = [];
+    let buf;
+    try{
+      const arr = await blob.arrayBuffer();
+      ensureCtx();
+      buf = await audioCtx.decodeAudioData(arr);
+    }catch(err){ toast('ไม่สามารถถอดรหัสเสียงที่อัดได้'); statusText.childNodes[0].textContent = 'Stopped. '; return; }
+    addTrackFromBuffer(buf, 'recording_' + tracks.length + '.wav');
+    toast('อัดเสียงเสร็จแล้ว เพิ่มเป็นแทร็กใหม่');
+    statusText.childNodes[0].textContent = 'Stopped. ';
+  }
+  btnRecord.addEventListener('click', toggleRecording);
+
+  // ---------- FX popup modals (scoped to active track) ----------
+  const FX_MODALS = [modalGain, modalSpeed, modalTune, modalChorus, modalReverb, modalFade, modalExport];
+  function closeAllFxModals(){ FX_MODALS.forEach(m=>m.classList.remove('show')); fxBackdrop.classList.remove('show'); }
+  function openFxModal(modal){ closeAllFxModals(); modal.classList.add('show'); fxBackdrop.classList.add('show'); }
+  btnOpenGain.addEventListener('click', ()=>openFxModal(modalGain));
+  btnOpenSpeed.addEventListener('click', ()=>openFxModal(modalSpeed));
+  btnOpenTune.addEventListener('click', ()=>openFxModal(modalTune));
+  btnOpenChorus.addEventListener('click', ()=>openFxModal(modalChorus));
+  btnOpenReverb.addEventListener('click', ()=>openFxModal(modalReverb));
+  btnOpenFade.addEventListener('click', ()=>openFxModal(modalFade));
+  btnOpenExport.addEventListener('click', ()=>{ manualSave.classList.remove('show'); openFxModal(modalExport); });
+  fxBackdrop.addEventListener('click', closeAllFxModals);
+  document.querySelectorAll('.fx-close').forEach(b=>b.addEventListener('click', closeAllFxModals));
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeAllFxModals(); });
+
+  function trackLabelFor(t){ return t ? ('แทร็ก ' + String(t.num).padStart(2,'0') + ' · ' + t.name) : ''; }
+
+  function refreshFxModalFieldsFromActiveTrack(){
+    const t = activeTrack();
+    $('gainModalTrackLabel').textContent = trackLabelFor(t);
+    $('speedModalTrackLabel').textContent = trackLabelFor(t);
+    $('tuneModalTrackLabel').textContent = trackLabelFor(t);
+    $('chorusModalTrackLabel').textContent = trackLabelFor(t);
+    $('reverbModalTrackLabel').textContent = trackLabelFor(t);
+    $('fadeModalTrackLabel').textContent = trackLabelFor(t);
+    if(!t) return;
+    volRange.value = t.extraGainDb; volVal.textContent = t.extraGainDb + ' dB';
+    bassRange.value = t.bassDb; bassVal.textContent = t.bassDb + ' dB';
+    trebleRange.value = t.trebleDb; trebleVal.textContent = t.trebleDb + ' dB';
+    speedRange.value = t.speed; speedVal.textContent = t.speed.toFixed(2)+'x';
+    $('btnPitchLock').classList.toggle('on', t.pitchPreserve);
+    $('pitchLabel').textContent = 'คงโทนเสียง: ' + (t.pitchPreserve?'ON':'OFF');
+    $('btnChipmunk').classList.toggle('on', t.chipmunk);
+    $('chipmunkLabel').textContent = 'เสียงชิบ: ' + (t.chipmunk?'ON':'OFF');
+    setPitchTuneUI(t.pitchSemitones);
+    chorusRateRange.value = t.chorus.rate; chorusRateVal.textContent = t.chorus.rate.toFixed(1)+' Hz';
+    chorusDepthRange.value = t.chorus.depth; chorusDepthVal.textContent = t.chorus.depth+' ms';
+    chorusMixRange.value = t.chorus.mix; chorusMixVal.textContent = t.chorus.mix+'%';
+    chorusVoicesRange.value = t.chorus.voices; chorusVoicesVal.textContent = t.chorus.voices;
+    btnChorusOn.classList.toggle('ensemble-on', t.chorus.on);
+    chorusOnLabel.textContent = 'Ensemble: ' + (t.chorus.on?'ON':'OFF');
+    reverbMixRange.value = t.reverb.mix; reverbMixVal.textContent = t.reverb.mix+'%';
+    reverbDecayRange.value = t.reverb.decay; reverbDecayVal.textContent = t.reverb.decay.toFixed(1)+' s';
+    btnReverbOn.classList.toggle('ensemble-on', t.reverb.on);
+    reverbOnLabel.textContent = 'Reverb: ' + (t.reverb.on?'ON':'OFF');
+    fadeInRange.value = t.fade.fadeIn; fadeInVal.textContent = t.fade.fadeIn.toFixed(1)+' s';
+    fadeOutRange.value = t.fade.fadeOut; fadeOutVal.textContent = t.fade.fadeOut.toFixed(1)+' s';
+  }
+  function setPitchTuneUI(st){
+    tuneRange.value = st; tuneVal.textContent = st + ' st';
+    tunePresets.querySelectorAll('.preset-btn').forEach(b=>{
+      b.classList.toggle('on', parseInt(b.dataset.st,10)===st);
+    });
+  }
+
+  volRange.addEventListener('input', e=>{
+    const t = activeTrack(); if(!t) return;
+    t.extraGainDb = parseFloat(e.target.value); volVal.textContent=e.target.value+' dB';
+    updateLiveTrackGain(t);
+  });
+  bassRange.addEventListener('input', e=>{
+    const t = activeTrack(); if(!t) return;
+    t.bassDb = parseFloat(e.target.value); bassVal.textContent=e.target.value+' dB';
+    const chain = liveTrackChains.get(t.id); if(chain && chain.bassFilter) chain.bassFilter.gain.value = t.bassDb;
+  });
+  trebleRange.addEventListener('input', e=>{
+    const t = activeTrack(); if(!t) return;
+    t.trebleDb = parseFloat(e.target.value); trebleVal.textContent=e.target.value+' dB';
+    const chain = liveTrackChains.get(t.id); if(chain && chain.trebleFilter) chain.trebleFilter.gain.value = t.trebleDb;
+  });
+  speedRange.addEventListener('input', e=>{
+    const t = activeTrack(); if(!t) return;
+    t.speed = parseFloat(e.target.value); speedVal.textContent=t.speed.toFixed(2)+'x';
+    if(isPlaying){ playFromAll(playhead); }
+  });
+  $('btnPitchLock').addEventListener('click', ()=>{
+    const t = activeTrack(); if(!t) return;
+    t.pitchPreserve = !t.pitchPreserve;
+    if(t.pitchPreserve && t.chipmunk){ t.chipmunk=false; $('btnChipmunk').classList.remove('on'); $('chipmunkLabel').textContent='เสียงชิบ: OFF'; }
+    $('btnPitchLock').classList.toggle('on', t.pitchPreserve);
+    $('pitchLabel').textContent = 'คงโทนเสียง: ' + (t.pitchPreserve?'ON':'OFF');
+    if(isPlaying) playFromAll(playhead);
+  });
+  $('btnChipmunk').addEventListener('click', ()=>{
+    const t = activeTrack(); if(!t) return;
+    t.chipmunk = !t.chipmunk;
+    if(t.chipmunk && t.pitchPreserve){ t.pitchPreserve=false; $('btnPitchLock').classList.remove('on'); $('pitchLabel').textContent='คงโทนเสียง: OFF'; }
+    $('btnChipmunk').classList.toggle('on', t.chipmunk);
+    $('chipmunkLabel').textContent = 'เสียงชิบ: ' + (t.chipmunk?'ON':'OFF');
+    if(isPlaying) playFromAll(playhead);
+  });
+  tuneRange.addEventListener('input', e=>{
+    const t = activeTrack(); if(!t) return;
+    t.pitchSemitones = Math.round(parseFloat(e.target.value));
+    setPitchTuneUI(t.pitchSemitones);
+    const chain = liveTrackChains.get(t.id);
+    if(chain){ for(const s of (chain.sources||[])){ if(s.detune) s.detune.value = t.pitchSemitones*100; } }
+  });
+  tunePresets.addEventListener('click', e=>{
+    const btn = e.target.closest('.preset-btn'); if(!btn) return;
+    const t = activeTrack(); if(!t) return;
+    t.pitchSemitones = parseInt(btn.dataset.st,10);
+    setPitchTuneUI(t.pitchSemitones);
+    const chain = liveTrackChains.get(t.id);
+    if(chain){ for(const s of (chain.sources||[])){ if(s.detune) s.detune.value = t.pitchSemitones*100; } }
+  });
+
+  btnChorusOn.addEventListener('click', ()=>{
+    const t = activeTrack(); if(!t) return;
+    t.chorus.on = !t.chorus.on;
+    btnChorusOn.classList.toggle('ensemble-on', t.chorus.on);
+    chorusOnLabel.textContent = 'Ensemble: ' + (t.chorus.on?'ON':'OFF');
+    renderTracksDOM();
+    if(isPlaying) playFromAll(playhead);
+  });
+  chorusRateRange.addEventListener('input', e=>{
+    const t = activeTrack(); if(!t) return;
+    t.chorus.rate = parseFloat(e.target.value); chorusRateVal.textContent = t.chorus.rate.toFixed(1)+' Hz';
+    if(isPlaying && t.chorus.on) playFromAll(playhead);
+  });
+  chorusDepthRange.addEventListener('input', e=>{
+    const t = activeTrack(); if(!t) return;
+    t.chorus.depth = parseFloat(e.target.value); chorusDepthVal.textContent = t.chorus.depth+' ms';
+    if(isPlaying && t.chorus.on) playFromAll(playhead);
+  });
+  chorusMixRange.addEventListener('input', e=>{
+    const t = activeTrack(); if(!t) return;
+    t.chorus.mix = parseFloat(e.target.value); chorusMixVal.textContent = t.chorus.mix+'%';
+    if(isPlaying && t.chorus.on) playFromAll(playhead);
+  });
+  chorusVoicesRange.addEventListener('input', e=>{
+    const t = activeTrack(); if(!t) return;
+    t.chorus.voices = parseInt(e.target.value,10); chorusVoicesVal.textContent = t.chorus.voices;
+    if(isPlaying && t.chorus.on) playFromAll(playhead);
+  });
+
+  btnReverbOn.addEventListener('click', ()=>{
+    const t = activeTrack(); if(!t) return;
+    t.reverb.on = !t.reverb.on;
+    btnReverbOn.classList.toggle('ensemble-on', t.reverb.on);
+    reverbOnLabel.textContent = 'Reverb: ' + (t.reverb.on?'ON':'OFF');
+    if(isPlaying) playFromAll(playhead);
+  });
+  reverbMixRange.addEventListener('input', e=>{
+    const t = activeTrack(); if(!t) return;
+    t.reverb.mix = parseFloat(e.target.value); reverbMixVal.textContent = t.reverb.mix+'%';
+    if(isPlaying && t.reverb.on) playFromAll(playhead);
+  });
+  reverbDecayRange.addEventListener('input', e=>{
+    const t = activeTrack(); if(!t) return;
+    t.reverb.decay = parseFloat(e.target.value); reverbDecayVal.textContent = t.reverb.decay.toFixed(1)+' s';
+    if(isPlaying && t.reverb.on) playFromAll(playhead);
+  });
+
+  fadeInRange.addEventListener('input', e=>{
+    const t = activeTrack(); if(!t) return;
+    t.fade.fadeIn = parseFloat(e.target.value); fadeInVal.textContent = t.fade.fadeIn.toFixed(1)+' s';
+    if(isPlaying) playFromAll(playhead);
+  });
+  fadeOutRange.addEventListener('input', e=>{
+    const t = activeTrack(); if(!t) return;
+    t.fade.fadeOut = parseFloat(e.target.value); fadeOutVal.textContent = t.fade.fadeOut.toFixed(1)+' s';
+    if(isPlaying) playFromAll(playhead);
+  });
+
+  btnResetFx.addEventListener('click', ()=>{
+    const t = activeTrack(); if(!t) return;
+    t.extraGainDb=0; t.bassDb=0; t.trebleDb=0; t.speed=1; t.pitchPreserve=false; t.chipmunk=false; t.pitchSemitones=0;
+    t.chorus = {on:false, rate:1.2, depth:6, mix:35, voices:2};
+    t.reverb = {on:false, mix:30, decay:1.8};
+    t.fade = {fadeIn:0, fadeOut:0};
+    refreshFxModalFieldsFromActiveTrack();
+    renderTracksDOM();
+    if(isPlaying) playFromAll(playhead);
+    toast('รีเซ็ตค่า FX ของแทร็กนี้แล้ว');
+  });
+
+  // ---------- Export helpers ----------
+  function floatTo16BitArray(float32Arr){
+    const out = new Int16Array(float32Arr.length);
+    for(let i=0;i<float32Arr.length;i++){
+      let s = Math.max(-1,Math.min(1,float32Arr[i]));
+      out[i] = s<0 ? s*0x8000 : s*0x7fff;
+    }
+    return out;
+  }
+  function encodeMp3(buffer){
+    if(typeof lamejs === 'undefined') throw new Error('lamejs not loaded');
+    const numCh = Math.min(2, buffer.numberOfChannels);
+    const sr = buffer.sampleRate;
+    const encoder = new lamejs.Mp3Encoder(numCh, sr, 192);
+    const sampleBlockSize = 1152;
+    const left = floatTo16BitArray(buffer.getChannelData(0));
+    const right = numCh>1 ? floatTo16BitArray(buffer.getChannelData(1)) : null;
+    const chunks = [];
+    for(let i=0; i<left.length; i+=sampleBlockSize){
+      const leftChunk = left.subarray(i, i+sampleBlockSize);
+      let mp3buf;
+      if(numCh>1){
+        const rightChunk = right.subarray(i, i+sampleBlockSize);
+        mp3buf = encoder.encodeBuffer(leftChunk, rightChunk);
+      } else {
+        mp3buf = encoder.encodeBuffer(leftChunk);
+      }
+      if(mp3buf.length>0) chunks.push(new Uint8Array(mp3buf));
+    }
+    const end = encoder.flush();
+    if(end.length>0) chunks.push(new Uint8Array(end));
+    return new Blob(chunks, {type:'audio/mp3'});
+  }
+
+  const OPUS_ENCODER_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/opus-recorder/8.0.5/encoderWorker.min.js';
+  let _opusWorkerPromise = null;
+  function loadOpusEncoderWorker(){
+    if(!_opusWorkerPromise){
+      _opusWorkerPromise = fetch(OPUS_ENCODER_WORKER_URL)
+        .then(r => { if(!r.ok) throw new Error('โหลด opus encoder ไม่สำเร็จ'); return r.text(); })
+        .then(code => {
+          const blobUrl = URL.createObjectURL(new Blob([code], {type:'application/javascript'}));
+          return new Worker(blobUrl);
+        });
+    }
+    return _opusWorkerPromise;
+  }
+  function encodeOggOpus(buffer, { bitRate = 160000, complexity = 8 } = {}){
+    return new Promise((resolve, reject) => {
+      loadOpusEncoderWorker().then(worker => {
+        const numCh = Math.min(2, buffer.numberOfChannels);
+        const chunkLen = 4096;
+        const pages = [];
+        let settled = false;
+        const timeoutId = setTimeout(()=>{ if(!settled){ settled=true; worker.onmessage=null; worker.onerror=null; reject(new Error('opus encode timeout')); } }, 120000);
+
+        worker.onmessage = ({data}) => {
+          if(settled) return;
+          if(data && data.message === 'page'){
+            pages.push(data.page);
+          } else if(data && data.message === 'done'){
+            settled = true; clearTimeout(timeoutId);
+            let total = 0; for(const p of pages) total += p.length;
+            const out = new Uint8Array(total);
+            let off = 0; for(const p of pages){ out.set(p, off); off += p.length; }
+            worker.onmessage = null; worker.onerror = null;
+            resolve(new Blob([out], {type:'audio/ogg; codecs=opus'}));
+          }
+        };
+        worker.onerror = (err) => { if(!settled){ settled=true; clearTimeout(timeoutId); reject(err); } };
+
+        worker.postMessage({
+          command: 'init',
+          encoderSampleRate: 48000,
+          bufferLength: chunkLen,
+          originalSampleRate: buffer.sampleRate,
+          numberOfChannels: numCh,
+          encoderApplication: 2049,
+          encoderComplexity: complexity,
+          encoderBitRate: bitRate,
+          resampleQuality: 6
+        });
+        worker.postMessage({ command: 'getHeaderPages' });
+
+        const chans = []; for(let c=0;c<numCh;c++) chans.push(buffer.getChannelData(c));
+        const total = buffer.length;
+        for(let i=0; i<total; i+=chunkLen){
+          const end = Math.min(total, i+chunkLen);
+          const bufs = [];
+          for(let c=0;c<numCh;c++) bufs.push(chans[c].subarray(i, end));
+          worker.postMessage({ command: 'encode', buffers: bufs });
+        }
+        worker.postMessage({ command: 'done' });
+      }).catch(reject);
+    });
+  }
+  function exportOggRealtimeFallback(buffer){
+    return new Promise((resolve, reject)=>{
+      if(typeof MediaRecorder === 'undefined'){ reject(new Error('MediaRecorder not supported')); return; }
+      const ctx = new (window.AudioContext||window.webkitAudioContext)();
+      const src = ctx.createBufferSource(); src.buffer = buffer;
+      const dest = ctx.createMediaStreamDestination();
+      src.connect(dest);
+
+      let mimeType = 'audio/ogg;codecs=opus';
+      if(!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'audio/webm;codecs=opus';
+      if(!MediaRecorder.isTypeSupported(mimeType)) mimeType = '';
+
+      let recorder;
+      try{ recorder = mimeType ? new MediaRecorder(dest.stream, {mimeType}) : new MediaRecorder(dest.stream); }
+      catch(err){ reject(err); return; }
+
+      const chunks = [];
+      recorder.ondataavailable = e => { if(e.data && e.data.size>0) chunks.push(e.data); };
+      recorder.onstop = () => {
+        const actualType = mimeType || recorder.mimeType || 'audio/webm';
+        resolve({ blob: new Blob(chunks, {type:actualType}), mimeType: actualType });
+        ctx.close();
+      };
+      recorder.onerror = e => reject(e.error || e);
+
+      recorder.start();
+      src.start(0);
+      src.onended = () => setTimeout(()=>{ if(recorder.state!=='inactive') recorder.stop(); }, 150);
+    });
+  }
+  // Robust download trigger: some in-app / restricted WebViews (e.g. a file opened via a
+  // content:// URI from a file manager) ignore the <a download> attribute, or revoke the
+  // blob URL before the download has actually started. To work around this we:
+  //  1) keep the blob URL alive for a while instead of revoking it immediately,
+  //  2) always populate a manual fallback link the user can long-press and save from
+  //     in case the automatic click-to-download doesn't do anything.
+  function triggerDownload(blob, filename){
+    const url = URL.createObjectURL(blob);
+    try{
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; a.rel = 'noopener'; a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }catch(err){
+      console.warn('Auto-download click failed:', err);
+    }
+    manualSaveLink.href = url;
+    manualSaveLink.textContent = filename;
+    manualSaveLink.setAttribute('download', filename);
+    manualSave.classList.add('show');
+    // Don't revoke right away — some WebViews start the download asynchronously.
+    setTimeout(()=>{ try{ URL.revokeObjectURL(url); }catch(e){} }, 120000);
+  }
+  async function resampleBuffer(buffer, targetRate){
+    if(!targetRate || targetRate === buffer.sampleRate) return buffer;
+    const targetLength = Math.max(1, Math.ceil(buffer.duration * targetRate));
+    const rsCtx = new OfflineAudioContext(buffer.numberOfChannels, targetLength, targetRate);
+    const src = rsCtx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(rsCtx.destination);
+    src.start(0);
+    return await rsCtx.startRendering();
+  }
+
+  // ---------- Offline mixdown of ALL tracks (used for Export) ----------
+  async function mixdownAllTracksOffline(){
+    ensureCtx();
+    const sr = audioCtx.sampleRate;
+    const numCh = 2;
+    const total = totalProjectDuration();
+    const length = Math.max(1, Math.ceil(total * sr) + sr);
+    const offline = new OfflineAudioContext(numCh, length, sr);
+    const master = offline.createGain(); master.connect(offline.destination);
+    const soloed = anyTrackSoloed();
+
+    for(const track of tracks){
+      if(!track.clips.length) continue;
+      const muted = soloed ? !track.solo : track.mute;
+      if(muted) continue;
+      const speed = effectiveRate(track);
+      const gainNode = offline.createGain(); gainNode.gain.value = Math.min(Math.pow(10,(track.gainDb+track.extraGainDb)/20),200);
+      const envGain = offline.createGain(); envGain.gain.value = 1;
+      const bassFilter = offline.createBiquadFilter(); bassFilter.type='lowshelf'; bassFilter.frequency.value=200; bassFilter.gain.value=track.bassDb;
+      const trebleFilter = offline.createBiquadFilter(); trebleFilter.type='highshelf'; trebleFilter.frequency.value=3000; trebleFilter.gain.value=track.trebleDb;
+      const panNode = offline.createStereoPanner ? offline.createStereoPanner() : null;
+      const chorus = track.chorus.on ? buildChorusChain(offline, track.chorus) : null;
+      const reverb = track.reverb.on ? buildReverbChain(offline, track.reverb) : null;
+
+      let entryNode = null, prevOutput = null;
+      for(const fx of [chorus, reverb]){
+        if(!fx) continue;
+        if(!entryNode) entryNode = fx.input;
+        if(prevOutput) prevOutput.connect(fx.input);
+        prevOutput = fx.output;
+      }
+      if(prevOutput) prevOutput.connect(bassFilter);
+      const preChain = entryNode || bassFilter;
+
+      bassFilter.connect(trebleFilter); trebleFilter.connect(gainNode);
+      gainNode.connect(envGain);
+      if(panNode){ panNode.pan.value = track.pan; envGain.connect(panNode); panNode.connect(master); }
+      else envGain.connect(master);
+
+      const dur = trackDuration(track);
+      scheduleFadeEnvelope(envGain, 0, 0, speed, dur, track.fade.fadeIn, track.fade.fadeOut);
+
+      for(const clip of track.clips){
+        const src = offline.createBufferSource();
+        src.buffer = clip.buffer;
+        src.playbackRate.value = speed;
+        if(src.detune && !track.pitchPreserve) src.detune.value = track.pitchSemitones*100;
+        src.connect(preChain);
+        const when = clip.start/speed;
+        try{ src.start(when); }catch(e){}
+      }
+    }
+    return await offline.startRendering();
+  }
+
+  // ---------- Export (mixes all tracks) ----------
+  btnExport.addEventListener('click', async ()=>{
+    if(!tracks.length) return;
+    const format = exportFormat.value;
+    manualSave.classList.remove('show');
+    loadingText.textContent = 'Mixing all tracks…';
+    loading.classList.add('show');
+    await new Promise(r=>setTimeout(r,50));
+    const customName = exportName.value.trim().replace(/[\\/:*?"<>|]+/g,'').replace(/\.[^/.]+$/,'');
+    const baseName = customName ? customName : `skypanel_mix`;
+    try{
+      let rendered = await mixdownAllTracksOffline();
+
+      const targetRate = parseInt(rateSelect.value, 10);
+      if(targetRate && targetRate !== rendered.sampleRate){
+        loadingText.textContent = 'Resampling to ' + targetRate + ' Hz…';
+        await new Promise(r=>setTimeout(r,20));
+        rendered = await resampleBuffer(rendered, targetRate);
+      }
+
+      if(format === 'wav'){
+        triggerDownload(encodeWav(rendered), `${baseName}.wav`);
+        toast('ส่งออกไฟล์ WAV เรียบร้อย — ถ้าไม่เริ่มดาวน์โหลดอัตโนมัติ ให้ใช้ลิงก์ด้านล่าง', true);
+      } else if(format === 'mp3'){
+        loadingText.textContent = 'Encoding MP3…';
+        await new Promise(r=>setTimeout(r,30));
+        try{
+          const blob = encodeMp3(rendered);
+          triggerDownload(blob, `${baseName}.mp3`);
+          toast('ส่งออกไฟล์ MP3 เรียบร้อย', true);
+        }catch(mp3Err){
+          console.warn('MP3 encoder failed (probably offline / CDN blocked), falling back to WAV:', mp3Err);
+          triggerDownload(encodeWav(rendered), `${baseName}.wav`);
+          toast('เข้ารหัส MP3 ไม่สำเร็จ (อาจไม่มีอินเทอร์เน็ต) จึงส่งออกเป็น WAV แทน', true);
+        }
+      } else if(format === 'ogg' || format === 'opus'){
+        loadingText.textContent = 'Encoding Opus…';
+        await new Promise(r=>setTimeout(r,20));
+        const ext = format === 'opus' ? 'opus' : 'ogg';
+        try{
+          const blob = await encodeOggOpus(rendered);
+          triggerDownload(blob, `${baseName}.${ext}`);
+          toast('ส่งออกไฟล์ ' + (format==='opus'?'Opus':'OGG') + ' เรียบร้อย', true);
+        }catch(encErr){
+          console.warn('Fast Opus encoder failed, falling back to realtime capture:', encErr);
+          try{
+            loadingText.textContent = 'Encoding (fallback, ช้ากว่าปกติ)…';
+            const {blob, mimeType} = await exportOggRealtimeFallback(rendered);
+            const fbExt = mimeType.includes('ogg') ? 'ogg' : 'webm';
+            triggerDownload(blob, `${baseName}.${fbExt}`);
+            toast('เข้ารหัสแบบเร็วไม่สำเร็จ จึงส่งออกแบบสำรอง (ช้ากว่าปกติ)', true);
+          }catch(fallbackErr){
+            console.warn('Realtime fallback also failed, exporting WAV instead:', fallbackErr);
+            triggerDownload(encodeWav(rendered), `${baseName}.wav`);
+            toast('เข้ารหัส Opus/OGG ไม่สำเร็จ จึงส่งออกเป็น WAV แทน', true);
+          }
+        }
+      }
+    }catch(err){
+      console.error(err);
+      toast('ส่งออกไม่สำเร็จ: ' + (err && err.message ? err.message : 'unknown error'), true);
+    }
+    loading.classList.remove('show');
+  });
+
+  window.addEventListener('resize', ()=>{ if(tracks.length) refreshAll(); });
+
+  // init status text node structure (so we can update just the text part, keep the span)
+  statusText.innerHTML = 'Stopped. <span id="activeTrackStatus"></span>';
+  updateEmptyState();
+})();
+</script>
+</body>
+</html>
