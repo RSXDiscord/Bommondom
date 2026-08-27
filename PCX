@@ -68,7 +68,7 @@ CreateHorrorButton()
 local function applyOutfitWithOriginal()
     pcall(function()
         -- เพิ่มรถตาม AssetId ที่ให้มา (ลบ ID: 417457461 ออกแล้ว)
-        game:GetService("ReplicatedStorage").Catalog.TryOn:InvokeServer({["Id"] = 132528490547963})
+        game:GetService("ReplicatedStorage").Catalog.TryOn:InvokeServer({["Id"] = 80667247268163})
     end)
 end
 
