@@ -122,7 +122,7 @@ end
 
 -- เพิ่มรายชื่อรถ
 CreateCarButton("Dream", "https://raw.githubusercontent.com/stampx85-byte/Bommondom/refs/heads/main/Dream")
-CreateCarButton("รถขายม่ามา", "https://raw.githubusercontent.com/stampx85-byte/Bommondom/refs/heads/main/%E0%B8%A3%E0%B8%96%E0%B8%82%E0%B8%B2%E0%B8%A2%E0%B8%A1%E0%B8%B2%E0%B8%A1%E0%B9%88%E0%B8%B2")
-CreateCarButton("PCX", "https://raw.githubusercontent.com/stampx85-byte/Bommondom/refs/heads/main/PCX")
-CreateCarButton("Fino", "https://raw.githubusercontent.com/stampx85-byte/Bommondom/refs/heads/main/%E0%B8%9F%E0%B8%B5%E0%B9%82%E0%B8%99%E0%B9%88")
+CreateCarButton("รถขนหมู", "https://raw.githubusercontent.com/stampx85-byte/Bommondom/refs/heads/main/%E0%B8%A3%E0%B8%96%E0%B8%82%E0%B8%B2%E0%B8%A2%E0%B8%A1%E0%B8%B2%E0%B8%A1%E0%B9%88%E0%B8%B2")
+CreateCarButton("scooter", "https://raw.githubusercontent.com/stampx85-byte/Bommondom/refs/heads/main/PCX")
+CreateCarButton("wave100", "https://raw.githubusercontent.com/stampx85-byte/Bommondom/refs/heads/main/%E0%B8%9F%E0%B8%B5%E0%B9%82%E0%B8%99%E0%B9%88")
 CreateCarButton("Forza", "https://raw.githubusercontent.com/stampx85-byte/Bommondom/refs/heads/main/%E0%B8%9F%E0%B8%AD%E0%B8%8A%E0%B9%88%E0%B8%B2")
