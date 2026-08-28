@@ -1,0 +1,1035 @@
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+-- State Variables (Combat & Aim)
+local AimbotEnabled = false
+local TargetPart = "Head"
+local FOVRadius = 120
+local AimMode = "Camera"
+local SnapLinesEnabled = false
+local SnapLineMode = "Static"
+local SnapLineThickness = 2
+local SpinBotEnabled = false
+local SpinSpeed = 25
+local CameraFOV = 70
+
+-- Safe Zone Variables
+local SafeZoneEnabled = false
+local IsInSafeZone = false
+local SavedPosition = nil
+
+-- Visuals State Variables
+local ESP_Enabled = false
+local ESP_Name_Enabled = true
+local ESP_Circle_Enabled = true
+local ESP_Rainbow = false
+local ESP_Color = Color3.fromRGB(255, 60, 90)
+
+-- Movement State Variables
+local NoclipEnabled = false
+local FlyEnabled = false
+local FlySpeed = 80
+
+-- GUI Base Setup
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "GetFree_RedGradient_HUB"
+ScreenGui.ResetOnSpawn = false
+
+if gethui then
+    ScreenGui.Parent = gethui()
+elseif syn and syn.protect_gui then
+    syn.protect_gui(ScreenGui)
+    ScreenGui.Parent = game:GetService("CoreGui")
+else
+    ScreenGui.Parent = game:GetService("CoreGui")
+end
+
+-- Main Frame
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 350, 0, 330)
+MainFrame.Position = UDim2.new(0.5, -175, 0.5, -165)
+MainFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+MainFrame.BorderSizePixel = 0
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.ClipsDescendants = true
+MainFrame.Parent = ScreenGui
+
+-- Animated Red Gradient Background
+local MainGradient = Instance.new("UIGradient")
+MainGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 20, 50)),
+    ColorSequenceKeypoint.new(0.4, Color3.fromRGB(150, 5, 25)),
+    ColorSequenceKeypoint.new(0.8, Color3.fromRGB(60, 0, 10)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 0, 5))
+}
+MainGradient.Rotation = 45
+MainGradient.Parent = MainFrame
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 14)
+MainCorner.Parent = MainFrame
+
+local MainStroke = Instance.new("UIStroke")
+MainStroke.Color = Color3.fromRGB(255, 60, 80)
+MainStroke.Thickness = 2.5
+MainStroke.Parent = MainFrame
+
+-- Mini Floating Circle Icon
+local MiniIcon = Instance.new("ImageButton")
+MiniIcon.Name = "MiniIcon"
+MiniIcon.Size = UDim2.new(0, 52, 0, 52)
+MiniIcon.Position = UDim2.new(0.1, 0, 0.2, 0)
+MiniIcon.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+MiniIcon.Image = "rbxassetid://6031075931"
+MiniIcon.ImageColor3 = Color3.fromRGB(255, 255, 255)
+MiniIcon.Visible = false
+MiniIcon.Active = true
+MiniIcon.Draggable = true
+MiniIcon.ZIndex = 100
+MiniIcon.Parent = ScreenGui
+
+local MiniGradient = Instance.new("UIGradient")
+MiniGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 50, 80)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 0, 20))
+}
+MiniGradient.Parent = MiniIcon
+
+local MiniCorner = Instance.new("UICorner")
+MiniCorner.CornerRadius = UDim.new(1, 0)
+MiniCorner.Parent = MiniIcon
+
+local MiniStroke = Instance.new("UIStroke")
+MiniStroke.Color = Color3.fromRGB(255, 80, 100)
+MiniStroke.Thickness = 2.5
+MiniStroke.Parent = MiniIcon
+
+-- Pulse Animation for MiniIcon
+task.spawn(function()
+    while true do
+        if MiniIcon.Visible then
+            TweenService:Create(MiniStroke, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Color = Color3.fromRGB(255, 180, 200)}):Play()
+            TweenService:Create(MiniIcon, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Size = UDim2.new(0, 56, 0, 56)}):Play()
+            task.wait(1)
+            TweenService:Create(MiniStroke, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Color = Color3.fromRGB(255, 30, 60)}):Play()
+            TweenService:Create(MiniIcon, TweenInfo.new(1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Size = UDim2.new(0, 50, 0, 50)}):Play()
+            task.wait(1)
+        else
+            task.wait(0.5)
+        end
+    end
+end)
+
+-- Topbar Header
+local Topbar = Instance.new("Frame")
+Topbar.Size = UDim2.new(1, 0, 0, 44)
+Topbar.BackgroundTransparency = 1
+Topbar.ZIndex = 5
+Topbar.Parent = MainFrame
+
+local MenuBtn = Instance.new("TextButton")
+MenuBtn.Size = UDim2.new(0, 40, 1, 0)
+MenuBtn.BackgroundTransparency = 1
+MenuBtn.Text = "≡"
+MenuBtn.TextColor3 = Color3.fromRGB(255, 200, 210)
+MenuBtn.TextSize = 26
+MenuBtn.Font = Enum.Font.GothamBold
+MenuBtn.ZIndex = 6
+MenuBtn.Parent = Topbar
+
+local MenuBtnStroke = Instance.new("UIStroke")
+MenuBtnStroke.Color = Color3.fromRGB(0, 0, 0)
+MenuBtnStroke.Thickness = 1.8
+MenuBtnStroke.Parent = MenuBtn
+
+local MinimizeBtn = Instance.new("TextButton")
+MinimizeBtn.Size = UDim2.new(0, 34, 0, 34)
+MinimizeBtn.Position = UDim2.new(1, -38, 0, 5)
+MinimizeBtn.BackgroundTransparency = 1
+MinimizeBtn.Text = "-"
+MinimizeBtn.TextColor3 = Color3.fromRGB(255, 200, 210)
+MinimizeBtn.TextSize = 28
+MinimizeBtn.Font = Enum.Font.GothamBold
+MinimizeBtn.ZIndex = 7
+MinimizeBtn.Parent = Topbar
+
+local MinimizeBtnStroke = Instance.new("UIStroke")
+MinimizeBtnStroke.Color = Color3.fromRGB(0, 0, 0)
+MinimizeBtnStroke.Thickness = 1.8
+MinimizeBtnStroke.Parent = MinimizeBtn
+
+MinimizeBtn.MouseButton1Click:Connect(function()
+    TweenService:Create(MainFrame, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {Size = UDim2.new(0, 0, 0, 0)}):Play()
+    task.wait(0.2)
+    MainFrame.Visible = false
+    MainFrame.Size = UDim2.new(0, 350, 0, 330)
+    MiniIcon.Position = UDim2.new(0, MainFrame.AbsolutePosition.X, 0, MainFrame.AbsolutePosition.Y)
+    MiniIcon.Visible = true
+end)
+
+MiniIcon.MouseButton1Click:Connect(function()
+    MiniIcon.Visible = false
+    MainFrame.Visible = true
+    MainFrame.Size = UDim2.new(0, 0, 0, 0)
+    TweenService:Create(MainFrame, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 350, 0, 330)}):Play()
+end)
+
+local TitleFrame = Instance.new("Frame")
+TitleFrame.Size = UDim2.new(1, -85, 1, 0)
+TitleFrame.Position = UDim2.new(0, 42, 0, 0)
+TitleFrame.BackgroundTransparency = 1
+TitleFrame.ZIndex = 6
+TitleFrame.Parent = Topbar
+
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 22)
+Title.Position = UDim2.new(0, 0, 0, 4)
+Title.BackgroundTransparency = 1
+Title.Text = "GetFree"
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.TextSize = 17
+Title.Font = Enum.Font.GothamBold
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.ZIndex = 6
+Title.Parent = TitleFrame
+
+local TitleStroke = Instance.new("UIStroke")
+TitleStroke.Color = Color3.fromRGB(0, 0, 0)
+TitleStroke.Thickness = 1.8
+TitleStroke.Parent = Title
+
+local SubTitle = Instance.new("TextLabel")
+SubTitle.Size = UDim2.new(1, 0, 0, 14)
+SubTitle.Position = UDim2.new(0, 0, 0, 24)
+SubTitle.BackgroundTransparency = 1
+SubTitle.Text = "Development by Sky"
+SubTitle.TextColor3 = Color3.fromRGB(255, 180, 190)
+SubTitle.TextSize = 11
+SubTitle.Font = Enum.Font.GothamMedium
+SubTitle.TextXAlignment = Enum.TextXAlignment.Left
+SubTitle.TextTransparency = 0
+SubTitle.ZIndex = 6
+SubTitle.Parent = TitleFrame
+
+local SubTitleStroke = Instance.new("UIStroke")
+SubTitleStroke.Color = Color3.fromRGB(0, 0, 0)
+SubTitleStroke.Thickness = 1.5
+SubTitleStroke.Transparency = 0
+SubTitleStroke.Parent = SubTitle
+
+task.spawn(function()
+    local text1 = "Development by Sky"
+    local text2 = "Red Gradient Hub"
+    local currentText = text1
+
+    while true do
+        task.wait(3)
+        local nextText = (currentText == text1) and text2 or text1
+        
+        TweenService:Create(SubTitle, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
+        TweenService:Create(SubTitleStroke, TweenInfo.new(0.5), {Transparency = 1}):Play()
+        task.wait(0.5)
+
+        SubTitle.Text = nextText
+        currentText = nextText
+
+        TweenService:Create(SubTitle, TweenInfo.new(0.5), {TextTransparency = 0}):Play()
+        TweenService:Create(SubTitleStroke, TweenInfo.new(0.5), {Transparency = 0}):Play()
+    end
+end)
+
+local LineDivider = Instance.new("Frame")
+LineDivider.Size = UDim2.new(1, 0, 0, 2)
+LineDivider.Position = UDim2.new(0, 0, 0, 44)
+LineDivider.BackgroundColor3 = Color3.fromRGB(255, 80, 100)
+LineDivider.BorderSizePixel = 0
+LineDivider.ZIndex = 5
+LineDivider.Parent = MainFrame
+
+-- Sidebar Container
+local Sidebar = Instance.new("Frame")
+Sidebar.Size = UDim2.new(0, 120, 1, -46)
+Sidebar.Position = UDim2.new(0, -125, 0, 46)
+Sidebar.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+Sidebar.BorderSizePixel = 0
+Sidebar.ZIndex = 15
+Sidebar.Parent = MainFrame
+
+local SideGradient = Instance.new("UIGradient")
+SideGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(80, 10, 25)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(25, 2, 8))
+}
+SideGradient.Rotation = 90
+SideGradient.Parent = Sidebar
+
+local SidebarStroke = Instance.new("UIStroke")
+SidebarStroke.Color = Color3.fromRGB(255, 60, 90)
+SidebarStroke.Thickness = 1.5
+SidebarStroke.Parent = Sidebar
+
+local function CreateTabButton(parent, pos, text)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -10, 0, 34)
+    btn.Position = pos
+    btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 11
+    btn.ZIndex = 16
+    btn.Parent = parent
+
+    local btnGrad = Instance.new("UIGradient")
+    btnGrad.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(200, 30, 60)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 10, 25))
+    }
+    btnGrad.Parent = btn
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(0, 0, 0)
+    stroke.Thickness = 1.5
+    stroke.Parent = btn
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = btn
+
+    return btn
+end
+
+local TabMainBtn = CreateTabButton(Sidebar, UDim2.new(0, 5, 0, 8), "ต่อสู้ (Combat)")
+local TabAimBtn = CreateTabButton(Sidebar, UDim2.new(0, 5, 0, 48), "ล็อกเป้า (Aimbot)")
+local TabVisualBtn = CreateTabButton(Sidebar, UDim2.new(0, 5, 0, 88), "มุมมอง (Visuals)")
+local TabMoveBtn = CreateTabButton(Sidebar, UDim2.new(0, 5, 0, 128), "เคลื่อนที่ (Move)")
+
+-- Pages Container
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Size = UDim2.new(1, -16, 1, -56)
+ContentFrame.Position = UDim2.new(0, 8, 0, 50)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Parent = MainFrame
+
+local MainPage = Instance.new("ScrollingFrame")
+MainPage.Size = UDim2.new(1, 0, 1, 0)
+MainPage.BackgroundTransparency = 1
+MainPage.ScrollBarThickness = 3
+MainPage.CanvasSize = UDim2.new(0, 0, 0, 220)
+MainPage.Parent = ContentFrame
+
+local AimPage = Instance.new("ScrollingFrame")
+AimPage.Size = UDim2.new(1, 0, 1, 0)
+AimPage.BackgroundTransparency = 1
+AimPage.Visible = false
+AimPage.ScrollBarThickness = 3
+AimPage.CanvasSize = UDim2.new(0, 0, 0, 320)
+AimPage.Parent = ContentFrame
+
+local VisualPage = Instance.new("ScrollingFrame")
+VisualPage.Size = UDim2.new(1, 0, 1, 0)
+VisualPage.BackgroundTransparency = 1
+VisualPage.Visible = false
+VisualPage.ScrollBarThickness = 3
+VisualPage.CanvasSize = UDim2.new(0, 0, 0, 280)
+VisualPage.Parent = ContentFrame
+
+local MovePage = Instance.new("ScrollingFrame")
+MovePage.Size = UDim2.new(1, 0, 1, 0)
+MovePage.BackgroundTransparency = 1
+MovePage.Visible = false
+MovePage.ScrollBarThickness = 3
+MovePage.CanvasSize = UDim2.new(0, 0, 0, 220)
+MovePage.Parent = ContentFrame
+
+-- UI Helpers
+local function CreateNeumorphicButton(parent, pos, text)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -6, 0, 36)
+    btn.Position = pos
+    btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 12
+    btn.AutoButtonColor = false
+    btn.Parent = parent
+
+    local btnTextStroke = Instance.new("UIStroke")
+    btnTextStroke.Color = Color3.fromRGB(0, 0, 0)
+    btnTextStroke.Thickness = 1.8
+    btnTextStroke.Parent = btn
+
+    local grad = Instance.new("UIGradient")
+    grad.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 60, 90)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 20, 50)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(90, 5, 20))
+    }
+    grad.Rotation = 90
+    grad.Parent = btn
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = btn
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(255, 100, 120)
+    stroke.Thickness = 1.8
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    stroke.Parent = btn
+
+    btn.MouseButton1Down:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.08), {Size = UDim2.new(0.95, 0, 0, 34), Position = pos + UDim2.new(0.025, 0, 0, 1)}):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.08), {Color = Color3.fromRGB(255, 200, 220)}):Play()
+    end)
+
+    btn.MouseButton1Up:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.08), {Size = UDim2.new(1, -6, 0, 36), Position = pos}):Play()
+        TweenService:Create(stroke, TweenInfo.new(0.08), {Color = Color3.fromRGB(255, 100, 120)}):Play()
+    end)
+
+    return btn, grad, stroke
+end
+
+local function CreateSlider(parent, pos, titleText, minVal, maxVal, defaultVal, callback)
+    local SliderFrame = Instance.new("Frame")
+    SliderFrame.Size = UDim2.new(1, -6, 0, 44)
+    SliderFrame.Position = pos
+    SliderFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    SliderFrame.Parent = parent
+
+    local SliderGrad = Instance.new("UIGradient")
+    SliderGrad.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(120, 15, 35)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(50, 5, 15))
+    }
+    SliderGrad.Parent = SliderFrame
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = SliderFrame
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(255, 60, 90)
+    stroke.Thickness = 1.2
+    stroke.Parent = SliderFrame
+
+    local Label = Instance.new("TextLabel")
+    Label.Size = UDim2.new(1, -10, 0, 18)
+    Label.Position = UDim2.new(0, 8, 0, 3)
+    Label.BackgroundTransparency = 1
+    Label.Text = titleText .. ": " .. tostring(defaultVal)
+    Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Label.Font = Enum.Font.GothamBold
+    Label.TextSize = 11
+    Label.TextXAlignment = Enum.TextXAlignment.Left
+    Label.Parent = SliderFrame
+
+    local LabelStroke = Instance.new("UIStroke")
+    LabelStroke.Color = Color3.fromRGB(0, 0, 0)
+    LabelStroke.Thickness = 1.5
+    LabelStroke.Parent = Label
+
+    local Track = Instance.new("Frame")
+    Track.Size = UDim2.new(1, -16, 0, 8)
+    Track.Position = UDim2.new(0, 8, 0, 26)
+    Track.BackgroundColor3 = Color3.fromRGB(30, 5, 10)
+    Track.Parent = SliderFrame
+
+    local TrackCorner = Instance.new("UICorner")
+    TrackCorner.CornerRadius = UDim.new(0, 4)
+    TrackCorner.Parent = Track
+
+    local Fill = Instance.new("Frame")
+    Fill.Size = UDim2.new((defaultVal - minVal)/(maxVal - minVal), 0, 1, 0)
+    Fill.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    Fill.BorderSizePixel = 0
+    Fill.Parent = Track
+
+    local FillGrad = Instance.new("UIGradient")
+    FillGrad.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 80, 100)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 180, 50))
+    }
+    FillGrad.Parent = Fill
+
+    local Dragging = false
+    local function Update(input)
+        local delta = math.clamp((input.Position.X - Track.AbsolutePosition.X) / Track.AbsoluteSize.X, 0, 1)
+        local val = math.floor(minVal + (maxVal - minVal) * delta)
+        Fill.Size = UDim2.new(delta, 0, 1, 0)
+        Label.Text = titleText .. ": " .. tostring(val)
+        callback(val)
+    end
+
+    Track.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            Dragging = true
+            Update(input)
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if Dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            Update(input)
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            Dragging = false
+        end
+    end)
+end
+
+-- Controls UI (Combat Page)
+local SafeZoneBtn, SafeGrad = CreateNeumorphicButton(MainPage, UDim2.new(0, 0, 0, 4), "พื้นที่ปลอดภัย (18-19% HP) : ปิด")
+local SpinBotBtn, SpinGrad = CreateNeumorphicButton(MainPage, UDim2.new(0, 0, 0, 46), "หมุนตัวละคร (SpinBot) : ปิด")
+
+CreateSlider(MainPage, UDim2.new(0, 0, 0, 88), "ความเร็วในการหมุน", 5, 100, SpinSpeed, function(val)
+    SpinSpeed = val
+end)
+
+-- Controls UI (Aimbot Page)
+local AimbotToggleBtn, AimGrad = CreateNeumorphicButton(AimPage, UDim2.new(0, 0, 0, 2), "ระบบล็อกเป้า : ปิด")
+local TargetPartBtn = CreateNeumorphicButton(AimPage, UDim2.new(0, 0, 0, 42), "ตำแหน่งล็อก : หัว (Head)")
+local AimModeBtn = CreateNeumorphicButton(AimPage, UDim2.new(0, 0, 0, 82), "โหมดล็อก : ลากกล้องตาม")
+local SnapLineBtn = CreateNeumorphicButton(AimPage, UDim2.new(0, 0, 0, 122), "เส้นชี้เป้า (SnapLine) : ปิด")
+local SnapLineStyleBtn = CreateNeumorphicButton(AimPage, UDim2.new(0, 0, 0, 162), "สีเส้นชี้เป้า : สีแดง")
+
+CreateSlider(AimPage, UDim2.new(0, 0, 0, 202), "ความหนาของเส้น", 1, 10, math.floor(SnapLineThickness), function(val)
+    SnapLineThickness = val
+end)
+
+CreateSlider(AimPage, UDim2.new(0, 0, 0, 250), "รัศมีวงกลมล็อก", 30, 300, FOVRadius, function(val)
+    FOVRadius = val
+end)
+
+-- Controls UI (Visuals Page)
+local ESPToggleBtn, ESPGrad = CreateNeumorphicButton(VisualPage, UDim2.new(0, 0, 0, 4), "มองทะลุ (ESP) : ปิด")
+local ESPNameBtn = CreateNeumorphicButton(VisualPage, UDim2.new(0, 0, 0, 46), "แสดงชื่อผู้เล่น : เปิด")
+local ESPCircleBtn = CreateNeumorphicButton(VisualPage, UDim2.new(0, 0, 0, 88), "วงกลมเชื่อมตัว : เปิด")
+local ESPColorBtn = CreateNeumorphicButton(VisualPage, UDim2.new(0, 0, 0, 130), "โหมดสี : สีแดงปกติ")
+
+CreateSlider(VisualPage, UDim2.new(0, 0, 0, 172), "ระยะมุมมองกล้อง (FOV)", 30, 120, CameraFOV, function(val)
+    CameraFOV = val
+end)
+
+-- Controls UI (Movement Page)
+local NoclipBtn, NoclipGrad = CreateNeumorphicButton(MovePage, UDim2.new(0, 0, 0, 4), "เดินทะลุ (Noclip) : ปิด")
+local FlyBtn, FlyGrad = CreateNeumorphicButton(MovePage, UDim2.new(0, 0, 0, 46), "ระบบนั่งบินมือถือ : ปิด")
+
+CreateSlider(MovePage, UDim2.new(0, 0, 0, 88), "ความเร็วบินติดพื้น", 20, 200, FlySpeed, function(val)
+    FlySpeed = val
+end)
+
+-- Navigation Logic
+local SidebarOpen = false
+MenuBtn.MouseButton1Click:Connect(function()
+    SidebarOpen = not SidebarOpen
+    local targetPos = SidebarOpen and UDim2.new(0, 0, 0, 46) or UDim2.new(0, -125, 0, 46)
+    TweenService:Create(Sidebar, TweenInfo.new(0.3, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Position = targetPos}):Play()
+end)
+
+local function SwitchTab(targetPage)
+    MainPage.Visible = false
+    AimPage.Visible = false
+    VisualPage.Visible = false
+    MovePage.Visible = false
+    targetPage.Visible = true
+    SidebarOpen = false
+    TweenService:Create(Sidebar, TweenInfo.new(0.25, Enum.EasingStyle.Quart), {Position = UDim2.new(0, -125, 0, 46)}):Play()
+end
+
+TabMainBtn.MouseButton1Click:Connect(function() SwitchTab(MainPage) end)
+TabAimBtn.MouseButton1Click:Connect(function() SwitchTab(AimPage) end)
+TabVisualBtn.MouseButton1Click:Connect(function() SwitchTab(VisualPage) end)
+TabMoveBtn.MouseButton1Click:Connect(function() SwitchTab(MovePage) end)
+
+-- ESP System Core
+local ESPFolder = Instance.new("Folder")
+ESPFolder.Name = "ESP_Folder_System"
+ESPFolder.Parent = workspace
+
+local function CreatePlayerESP(player)
+    if player == LocalPlayer then return end
+
+    local function SetupChar(char)
+        if not char then return end
+        local hrp = char:WaitForChild("HumanoidRootPart", 5)
+        local head = char:WaitForChild("Head", 5)
+        if not hrp or not head then return end
+
+        local highlight = Instance.new("Highlight")
+        highlight.Name = player.Name .. "_HL"
+        highlight.Adornee = char
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.FillTransparency = 0.5
+        highlight.OutlineTransparency = 0
+        highlight.Parent = ESPFolder
+
+        local bgui = Instance.new("BillboardGui")
+        bgui.Name = player.Name .. "_Name"
+        bgui.Adornee = head
+        bgui.Size = UDim2.new(0, 100, 0, 30)
+        bgui.StudsOffset = Vector3.new(0, 2.5, 0)
+        bgui.AlwaysOnTop = true
+
+        local txt = Instance.new("TextLabel")
+        txt.Size = UDim2.new(1, 0, 1, 0)
+        txt.BackgroundTransparency = 1
+        txt.Text = player.DisplayName
+        txt.TextColor3 = Color3.fromRGB(255, 255, 255)
+        txt.Font = Enum.Font.GothamBold
+        txt.TextSize = 13
+        txt.Parent = bgui
+        
+        local txtStroke = Instance.new("UIStroke")
+        txtStroke.Color = Color3.fromRGB(0, 0, 0)
+        txtStroke.Thickness = 1.5
+        txtStroke.Parent = txt
+
+        bgui.Parent = ESPFolder
+
+        local sphere = Instance.new("SelectionSphere")
+        sphere.Name = player.Name .. "_Sphere"
+        sphere.Adornee = hrp
+        sphere.SurfaceTransparency = 0.3
+        sphere.Parent = ESPFolder
+    end
+
+    if player.Character then SetupChar(player.Character) end
+    player.CharacterAdded:Connect(SetupChar)
+end
+
+for _, p in pairs(Players:GetPlayers()) do CreatePlayerESP(p) end
+Players.PlayerAdded:Connect(CreatePlayerESP)
+
+-- ESP Button Actions
+ESPToggleBtn.MouseButton1Click:Connect(function()
+    ESP_Enabled = not ESP_Enabled
+    if ESP_Enabled then
+        ESPToggleBtn.Text = "มองทะลุ (ESP) : เปิด"
+        ESPToggleBtn.TextColor3 = Color3.fromRGB(255, 200, 210)
+        ESPGrad.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 100, 120)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 20, 40))
+        }
+    else
+        ESPToggleBtn.Text = "มองทะลุ (ESP) : ปิด"
+        ESPToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        ESPGrad.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 60, 90)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 20, 50)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(90, 5, 20))
+        }
+    end
+end)
+
+ESPNameBtn.MouseButton1Click:Connect(function()
+    ESP_Name_Enabled = not ESP_Name_Enabled
+    ESPNameBtn.Text = "แสดงชื่อผู้เล่น : " .. (ESP_Name_Enabled and "เปิด" or "ปิด")
+end)
+
+ESPCircleBtn.MouseButton1Click:Connect(function()
+    ESP_Circle_Enabled = not ESP_Circle_Enabled
+    ESPCircleBtn.Text = "วงกลมเชื่อมตัว : " .. (ESP_Circle_Enabled and "เปิด" or "ปิด")
+end)
+
+ESPColorBtn.MouseButton1Click:Connect(function()
+    ESP_Rainbow = not ESP_Rainbow
+    if ESP_Rainbow then
+        ESPColorBtn.Text = "โหมดสี : สีรุ้ง (Rainbow)"
+    else
+        ESPColorBtn.Text = "โหมดสี : สีแดงปกติ"
+        ESP_Color = Color3.fromRGB(255, 60, 90)
+    end
+end)
+
+-- Movement Logic (Noclip & Mobile Sit Ground Fly)
+NoclipBtn.MouseButton1Click:Connect(function()
+    NoclipEnabled = not NoclipEnabled
+    if NoclipEnabled then
+        NoclipBtn.Text = "เดินทะลุ (Noclip) : เปิด"
+        NoclipBtn.TextColor3 = Color3.fromRGB(255, 200, 210)
+        NoclipGrad.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 100, 120)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 20, 40))
+        }
+    else
+        NoclipBtn.Text = "เดินทะลุ (Noclip) : ปิด"
+        NoclipBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        NoclipGrad.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 60, 90)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 20, 50)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(90, 5, 20))
+        }
+    end
+end)
+
+local flyGyro, flyVel
+local function StartMobileSitFly()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum then return end
+
+    hum.Sit = true
+
+    flyGyro = Instance.new("BodyGyro")
+    flyGyro.P = 9e4
+    flyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+    flyGyro.CFrame = hrp.CFrame
+    flyGyro.Parent = hrp
+
+    flyVel = Instance.new("BodyVelocity")
+    flyVel.Velocity = Vector3.zero
+    flyVel.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+    flyVel.Parent = hrp
+
+    task.spawn(function()
+        while FlyEnabled and char and hum.Health > 0 do
+            RunService.RenderStepped:Wait()
+            hum.Sit = true
+
+            -- คำนวณทิศทางจากการเดินมือถือ (Joystick Input)
+            local moveVector = hum.MoveDirection
+            
+            -- ตรวจสอบระดับความสูงพื้นด้วย Raycast เพื่อให้แตะติดพื้นตลอดเวลา
+            local raycastParams = RaycastParams.new()
+            raycastParams.FilterDescendantsInstances = {char}
+            raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+
+            local rayResult = workspace:Raycast(hrp.Position, Vector3.new(0, -15, 0), raycastParams)
+            local groundY = hrp.Position.Y
+            if rayResult then
+                groundY = rayResult.Position.Y + 2.5 -- ลอยสูงจากพื้นเล็กน้อยในท่านั่ง
+            end
+
+            -- ล็อกแกน Y ให้ขนานติดพื้น แล้วพุ่งไปด้วยความเร็ว FlySpeed
+            local targetVelocity = Vector3.new(moveVector.X * FlySpeed, (groundY - hrp.Position.Y) * 10, moveVector.Z * FlySpeed)
+            flyVel.Velocity = targetVelocity
+
+            if moveVector.Magnitude > 0 then
+                flyGyro.CFrame = CFrame.new(hrp.Position, hrp.Position + Vector3.new(moveVector.X, 0, moveVector.Z))
+            else
+                flyGyro.CFrame = CFrame.new(hrp.Position, hrp.Position + Camera.CFrame.LookVector * Vector3.new(1, 0, 1))
+            end
+        end
+
+        if flyGyro then flyGyro:Destroy() end
+        if flyVel then flyVel:Destroy() end
+        if hum then hum.Sit = false end
+    end)
+end
+
+FlyBtn.MouseButton1Click:Connect(function()
+    FlyEnabled = not FlyEnabled
+    if FlyEnabled then
+        FlyBtn.Text = "ระบบนั่งบินมือถือ : เปิด"
+        FlyBtn.TextColor3 = Color3.fromRGB(255, 200, 210)
+        FlyGrad.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 100, 120)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 20, 40))
+        }
+        StartMobileSitFly()
+    else
+        FlyBtn.Text = "ระบบนั่งบินมือถือ : ปิด"
+        FlyBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        FlyGrad.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 60, 90)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 20, 50)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(90, 5, 20))
+        }
+    end
+end)
+
+-- Safe Zone Toggle
+SafeZoneBtn.MouseButton1Click:Connect(function()
+    SafeZoneEnabled = not SafeZoneEnabled
+    if SafeZoneEnabled then
+        SafeZoneBtn.Text = "พื้นที่ปลอดภัย (18-19% HP) : เปิด"
+        SafeZoneBtn.TextColor3 = Color3.fromRGB(255, 200, 210)
+        SafeGrad.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 100, 120)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 20, 40))
+        }
+    else
+        SafeZoneBtn.Text = "พื้นที่ปลอดภัย (18-19% HP) : ปิด"
+        SafeZoneBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        SafeGrad.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 60, 90)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 20, 50)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(90, 5, 20))
+        }
+        
+        if IsInSafeZone and SavedPosition and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = SavedPosition
+            IsInSafeZone = false
+            SavedPosition = nil
+        end
+    end
+end)
+
+-- SpinBot Toggle
+SpinBotBtn.MouseButton1Click:Connect(function()
+    SpinBotEnabled = not SpinBotEnabled
+    if SpinBotEnabled then
+        SpinBotBtn.Text = "หมุนตัวละคร (SpinBot) : เปิด"
+        SpinBotBtn.TextColor3 = Color3.fromRGB(255, 200, 210)
+        SpinGrad.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 100, 120)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 20, 40))
+        }
+    else
+        SpinBotBtn.Text = "หมุนตัวละคร (SpinBot) : ปิด"
+        SpinBotBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        SpinGrad.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 60, 90)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 20, 50)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(90, 5, 20))
+        }
+    end
+end)
+
+-- Aimbot Controls
+AimbotToggleBtn.MouseButton1Click:Connect(function()
+    AimbotEnabled = not AimbotEnabled
+    if AimbotEnabled then
+        AimbotToggleBtn.Text = "ระบบล็อกเป้า : เปิด"
+        AimbotToggleBtn.TextColor3 = Color3.fromRGB(255, 200, 210)
+        AimGrad.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 100, 120)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(150, 20, 40))
+        }
+    else
+        AimbotToggleBtn.Text = "ระบบล็อกเป้า : ปิด"
+        AimbotToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        AimGrad.Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 60, 90)),
+            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(180, 20, 50)),
+            ColorSequenceKeypoint.new(1, Color3.fromRGB(90, 5, 20))
+        }
+    end
+end)
+
+TargetPartBtn.MouseButton1Click:Connect(function()
+    if TargetPart == "Head" then
+        TargetPart = "HumanoidRootPart"
+        TargetPartBtn.Text = "ตำแหน่งล็อก : ลำตัว (Torso)"
+    else
+        TargetPart = "Head"
+        TargetPartBtn.Text = "ตำแหน่งล็อก : หัว (Head)"
+    end
+end)
+
+AimModeBtn.MouseButton1Click:Connect(function()
+    if AimMode == "Camera" then
+        AimMode = "Center"
+        AimModeBtn.Text = "โหมดล็อก : ล็อกกลางจอ"
+    else
+        AimMode = "Camera"
+        AimModeBtn.Text = "โหมดล็อก : ลากกล้องตาม"
+    end
+end)
+
+SnapLineBtn.MouseButton1Click:Connect(function()
+    SnapLinesEnabled = not SnapLinesEnabled
+    if SnapLinesEnabled then
+        SnapLineBtn.Text = "เส้นชี้เป้า (SnapLine) : เปิด"
+        SnapLineBtn.TextColor3 = Color3.fromRGB(255, 200, 210)
+    else
+        SnapLineBtn.Text = "เส้นชี้เป้า (SnapLine) : ปิด"
+        SnapLineBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    end
+end)
+
+SnapLineStyleBtn.MouseButton1Click:Connect(function()
+    if SnapLineMode == "Static" then
+        SnapLineMode = "Rainbow"
+        SnapLineStyleBtn.Text = "สีเส้นชี้เป้า : สีรุ้ง (Rainbow)"
+    elseif SnapLineMode == "Rainbow" then
+        SnapLineMode = "Gradient"
+        SnapLineStyleBtn.Text = "สีเส้นชี้เป้า : ไล่ระดับสี (Gradient)"
+    else
+        SnapLineMode = "Static"
+        SnapLineStyleBtn.Text = "สีเส้นชี้เป้า : สีแดง"
+    end
+end)
+
+-- Overlay Graphics & SnapLines
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Thickness = 2
+FOVCircle.Color = Color3.fromRGB(255, 60, 90)
+FOVCircle.Filled = false
+FOVCircle.Transparency = 1
+FOVCircle.NumSides = 64
+FOVCircle.Radius = FOVRadius
+FOVCircle.Visible = false
+
+local SnapLinesPool = {}
+local function GetSnapLine(index)
+    if not SnapLinesPool[index] then
+        local line = Drawing.new("Line")
+        line.Transparency = 1
+        line.Visible = false
+        SnapLinesPool[index] = line
+    end
+    return SnapLinesPool[index]
+end
+
+local function HideAllSnapLines()
+    for _, line in ipairs(SnapLinesPool) do
+        line.Visible = false
+    end
+end
+
+local function GetClosestPlayer()
+    local OriginPos = (AimMode == "Camera") and UserInputService:GetMouseLocation() or Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local ClosestPlayer = nil
+    local ShortestDistance = FOVRadius
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild(TargetPart) and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+            local ScreenPos, OnScreen = Camera:WorldToViewportPoint(player.Character[TargetPart].Position)
+            if OnScreen then
+                local Dist = (Vector2.new(ScreenPos.X, ScreenPos.Y) - OriginPos).Magnitude
+                if Dist < ShortestDistance then
+                    ShortestDistance = Dist
+                    ClosestPlayer = player
+                end
+            end
+        end
+    end
+    return ClosestPlayer
+end
+
+-- RenderStepped Main Loop
+local hue = 0
+local bgRotation = 0
+
+RunService.RenderStepped:Connect(function()
+    hue = (hue + 0.005) % 1
+    
+    bgRotation = (bgRotation + 0.6) % 360
+    MainGradient.Rotation = bgRotation
+    MiniGradient.Rotation = bgRotation
+
+    Camera.FieldOfView = CameraFOV
+
+    -- ESP Loop Updater
+    if ESP_Rainbow then
+        ESP_Color = Color3.fromHSV(hue, 1, 1)
+    end
+
+    for _, child in pairs(ESPFolder:GetChildren()) do
+        if child:IsA("Highlight") then
+            child.Enabled = ESP_Enabled
+            child.FillColor = ESP_Color
+            child.OutlineColor = ESP_Color
+        elseif child:IsA("BillboardGui") then
+            child.Enabled = ESP_Enabled and ESP_Name_Enabled
+        elseif child:IsA("SelectionSphere") then
+            child.Visible = ESP_Enabled and ESP_Circle_Enabled
+            child.Color3 = ESP_Color
+        end
+    end
+
+    -- Noclip Loop
+    if NoclipEnabled and LocalPlayer.Character then
+        for _, part in pairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+
+    -- Safe Zone Logic
+    if SafeZoneEnabled and LocalPlayer.Character then
+        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        
+        if hum and hrp and hum.Health > 0 then
+            local healthPercent = (hum.Health / hum.MaxHealth) * 100
+            if (healthPercent >= 18 and healthPercent <= 19) or IsInSafeZone then
+                if not IsInSafeZone then
+                    SavedPosition = hrp.CFrame
+                    IsInSafeZone = true
+                end
+                hrp.CFrame = CFrame.new(SavedPosition.Position.X, -200, SavedPosition.Position.Z)
+                hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            end
+        end
+    end
+
+    -- SpinBot Logic
+    if SpinBotEnabled and LocalPlayer.Character then
+        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        local hrp = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hum and hum.Health > 0 and hrp then
+            pcall(function()
+                hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(SpinSpeed), 0)
+            end)
+        end
+    end
+
+    -- Aimbot & FOV Circle Logic
+    local CenterScreen = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local CurrentPos = (AimMode == "Camera") and UserInputService:GetMouseLocation() or CenterScreen
+    
+    FOVCircle.Position = CurrentPos
+    FOVCircle.Radius = FOVRadius
+    FOVCircle.Visible = AimbotEnabled
+
+    if AimbotEnabled then
+        local Target = GetClosestPlayer()
+        if Target and Target.Character and Target.Character:FindFirstChild(TargetPart) then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, Target.Character[TargetPart].Position)
+        end
+    end
+
+    -- SnapLines
+    if SnapLinesEnabled then
+        local lineIndex = 1
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild(TargetPart) and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+                local TargetWorldPos = player.Character[TargetPart].Position
+                local ScreenPos, OnScreen = Camera:WorldToViewportPoint(TargetWorldPos)
+
+                if OnScreen then
+                    local line = GetSnapLine(lineIndex)
+                    line.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                    line.To = Vector2.new(ScreenPos.X, ScreenPos.Y)
+                    line.Thickness = SnapLineThickness
+
+                    if SnapLineMode == "Rainbow" then
+                        line.Color = Color3.fromHSV(hue, 0.9, 1)
+                    elseif SnapLineMode == "Gradient" then
+                        local dist = (Vector2.new(ScreenPos.X, ScreenPos.Y) - CurrentPos).Magnitude
+                        local factor = math.clamp(dist / FOVRadius, 0, 1)
+                        line.Color = Color3.fromRGB(255, math.floor(255 * (1 - factor)), 50)
+                    else
+                        line.Color = Color3.fromRGB(255, 60, 90)
+                    end
+
+                    line.Visible = true
+                    lineIndex = lineIndex + 1
+                end
+            end
+        end
+
+        for i = lineIndex, #SnapLinesPool do
+            SnapLinesPool[i].Visible = false
+        end
+    else
+        HideAllSnapLines()
+    end
+end)
