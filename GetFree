@@ -1,13 +1,15 @@
--- Delta Executor Compatible (V15.4: Added Full ESP Categories & Professional Management Engine)
+-- Delta Executor Compatible (V15.9: Mobile-Friendly Fly & Full UI Settings Manager)
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TeleportService = game:GetService("TeleportService")
 local Stats = game:GetService("Stats")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
+local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
-local Camera = workspace.CurrentCamera
 
 -- Global Configurations
 local AimLockSettings = {
@@ -36,7 +38,7 @@ local HitboxSettings = {
     TargetPart = "HumanoidRootPart"
 }
 
--- Comprehensive ESP Settings Engine
+-- Comprehensive ESP Settings Engine (Integrated into BloxSpin / Master Settings)
 local ESPSettings = {
     Enabled = false,
     Box = false,
@@ -64,7 +66,10 @@ local AdvancedMovementEngine = {
     JumpEnabled = false,
     JumpPower = 50,
     BypassDetection = true,
-    NoClip = false
+    NoClip = false,
+    InfiniteJump = false,
+    FlyEnabled = false,
+    FlySpeed = 50
 }
 
 -- Steal An Egg & Auto Farm Settings
@@ -74,6 +79,229 @@ local StealEggSettings = {
     ManualSpeedEnabled = false,
     ReturnCFrame = CFrame.new(517.982666, 70.7262878, -355.470642, 1, 0, 0, 0, 1, 0, 0, 0, 1)
 }
+
+-- TSB Settings Configuration (Dash-Triggered Zigzag & Lock Logic)
+local TSBSettings = {
+    TargetAnimId = "10503381238",
+    QDashId = "10479335397",
+    DashKey = Enum.KeyCode.Q,
+    LockDuration = 0.9,
+    SpinDelay = 1,
+    LastSpin = 0,
+    NormalEnabled = true,
+    SpinEnabled = false,
+    TechSubEnabled = false,
+    ZigzagEnabled = true,
+    AimbotEnabled = false,
+    AutoFpsBoost = false,
+    TargetMode = 1 -- 1: ALL, 2: PLAYER ONLY, 3: DUMMY ONLY
+}
+
+local UPPERCUT_ANIM_IDS = {
+    ["10469630950"] = true,
+    ["10469493270"] = true,
+}
+
+local SPIN_ANIM_IDS = {
+    ["13294471966"] = true, ["13532604085"] = true, ["13532600125"] = true,
+    ["13532562418"] = true, ["10469493270"] = true, ["10469630950"] = true,
+    ["10503381238"] = true
+}
+
+local TSB_REMOTE_NAME = "DashEvent"
+
+local function TriggerTSBDashServer()
+    local dashRemote = ReplicatedStorage:FindFirstChild(TSB_REMOTE_NAME, true) 
+        or (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild(TSB_REMOTE_NAME, true))
+
+    if dashRemote and dashRemote:IsA("RemoteEvent") then
+        pcall(function()
+            dashRemote:FireServer("Dash", TSBSettings.DashKey)
+        end)
+    end
+end
+
+local tsbCachedTarget = nil
+local tsbLastTargetCheck = 0
+
+local function FindTSBGlobalTarget()
+    local now = tick()
+    if now - tsbLastTargetCheck < 0.1 and tsbCachedTarget and tsbCachedTarget.Parent then
+        return tsbCachedTarget
+    end
+    tsbLastTargetCheck = now
+
+    local Character = LocalPlayer.Character
+    if not Character or not Character:FindFirstChild("HumanoidRootPart") then 
+        tsbCachedTarget = nil
+        return nil 
+    end
+    
+    local RootPart = Character.HumanoidRootPart
+    local closest, lastDist = nil, 80 
+    
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("Humanoid") and obj.Parent ~= Character then
+            local isPlayer = Players:GetPlayerFromCharacter(obj.Parent)
+            local isDummy = not isPlayer
+            local canTarget = (TSBSettings.TargetMode == 1) or (TSBSettings.TargetMode == 2 and isPlayer) or (TSBSettings.TargetMode == 3 and isDummy)
+            if canTarget then
+                local targetRoot = obj.Parent:FindFirstChild("HumanoidRootPart")
+                if targetRoot then
+                    local dist = (RootPart.Position - targetRoot.Position).Magnitude
+                    if dist < lastDist then 
+                        lastDist = dist 
+                        closest = targetRoot 
+                    end
+                end
+            end
+        end
+    end
+    tsbCachedTarget = closest
+    return closest
+end
+
+local function IsPlayingTSBUppercut(Humanoid)
+    for _, track in pairs(Humanoid:GetPlayingAnimationTracks()) do
+        local id = track.Animation.AnimationId
+        if UPPERCUT_ANIM_IDS[id] or UPPERCUT_ANIM_IDS[id:sub(-11)] then
+            return true
+        end
+    end
+    return false
+end
+
+local function ConnectTSBCharacter(Character)
+    local Humanoid = Character:WaitForChild("Humanoid")
+    local RootPart = Character:WaitForChild("HumanoidRootPart")
+
+    Humanoid.AnimationPlayed:Connect(function(track)
+        local animId = track.Animation.AnimationId
+        
+        if (animId:find(TSBSettings.TargetAnimId) or animId:find(TSBSettings.QDashId)) then
+            if IsPlayingTSBUppercut(Humanoid) then return end
+
+            local target = FindTSBGlobalTarget()
+            task.wait(track.Length * 0.30)
+            if target and target.Parent then
+                if TSBSettings.ZigzagEnabled then
+                    task.spawn(TriggerTSBDashServer)
+                    local startTime = tick()
+                    local connection
+                    connection = RunService.Heartbeat:Connect(function()
+                        local elapsed = tick() - startTime
+                        
+                        if IsPlayingTSBUppercut(Humanoid) then
+                            connection:Disconnect()
+                            return
+                        end
+
+                        if target and target.Parent and elapsed < TSBSettings.LockDuration then
+                            local tPos = target.Position
+                            local sideOffset = math.sin(elapsed * 35) * 6.5
+                            local forwardOffset = target.CFrame.LookVector * 1.5
+                            local rightOffset = target.CFrame.RightVector * sideOffset
+                            
+                            RootPart.CFrame = CFrame.new(tPos + forwardOffset + rightOffset, tPos)
+                        else
+                            connection:Disconnect()
+                        end
+                    end)
+                elseif TSBSettings.TechSubEnabled then
+                    task.spawn(TriggerTSBDashServer)
+                    local startTime = tick()
+                    local connection
+                    connection = RunService.Heartbeat:Connect(function()
+                        local elapsed = tick() - startTime
+                        if target and target.Parent and elapsed < TSBSettings.LockDuration then
+                            local tPos = target.Position
+                            if elapsed < 0.4 then
+                                local sideOffset = math.sin(elapsed * 40) * 7 
+                                RootPart.CFrame = CFrame.new(tPos + (target.CFrame.RightVector * sideOffset), tPos)
+                            else
+                                local camLook = Camera.CFrame.LookVector
+                                local warpPos = (camLook.Y < -0.3) and target.Position + (target.CFrame.LookVector * -2.5) or target.Position + (target.CFrame.LookVector * 1.5)
+                                RootPart.CFrame = CFrame.new(warpPos, Vector3.new(tPos.X, tPos.Y + 60, tPos.Z))
+                            end
+                        else
+                            connection:Disconnect()
+                        end
+                    end)
+                elseif TSBSettings.NormalEnabled then
+                    task.spawn(TriggerTSBDashServer)
+                    local startTime = tick()
+                    local connection
+                    connection = RunService.Heartbeat:Connect(function()
+                        if target and target.Parent and (tick() - startTime) < TSBSettings.LockDuration then
+                            RootPart.CFrame = CFrame.new(target.Position + (target.CFrame.LookVector * 1.2), Vector3.new(target.Position.X, target.Position.Y + 15, target.Position.Z))
+                        else
+                            connection:Disconnect()
+                        end
+                    end)
+                end
+            end
+        elseif (SPIN_ANIM_IDS[animId:sub(-11)] or SPIN_ANIM_IDS[animId]) and TSBSettings.SpinEnabled then
+            if tick() - TSBSettings.LastSpin < TSBSettings.SpinDelay then return end
+            TSBSettings.LastSpin = tick()
+            local target = FindTSBGlobalTarget()
+            if target and target.Parent then
+                task.spawn(TriggerTSBDashServer)
+                local startTime, angle = tick(), 0
+                local connection
+                connection = RunService.Heartbeat:Connect(function()
+                    if target and target.Parent and (tick() - startTime) < TSBSettings.LockDuration then
+                        angle = angle + 0.8
+                        local offset = Vector3.new(math.cos(angle) * 6, 0, math.sin(angle) * 6)
+                        RootPart.CFrame = CFrame.new(target.Position + offset, target.Position)
+                    else
+                        connection:Disconnect()
+                    end
+                end)
+            end
+        end
+    end)
+end
+
+if LocalPlayer.Character then ConnectTSBCharacter(LocalPlayer.Character) end
+LocalPlayer.CharacterAdded:Connect(ConnectTSBCharacter)
+
+RunService.RenderStepped:Connect(function(dt)
+    if TSBSettings.AimbotEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local target = FindTSBGlobalTarget()
+        if target then
+            local RootPart = LocalPlayer.Character.HumanoidRootPart
+            local targetCFrame = CFrame.lookAt(RootPart.Position, Vector3.new(target.Position.X, RootPart.Position.Y, target.Position.Z))
+            RootPart.CFrame = RootPart.CFrame:Lerp(targetCFrame, math.clamp(dt * 25, 0, 1))
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(0.5)
+        if TSBSettings.AutoFpsBoost then
+            pcall(function()
+                local thrown = workspace:FindFirstChild("Thrown", true)
+                if thrown then
+                    for _, v in pairs(thrown:GetDescendants()) do
+                        if v.Name == "Debris" or v.Name == "SmallDebris" or v.Name == "Part" or v:IsA("Part") then
+                            v:Destroy()
+                        end
+                    end
+                end
+                
+                local trees = workspace:FindFirstChild("Trees", true)
+                if trees then
+                    for _, v in pairs(trees:GetChildren()) do
+                        if v:IsA("Model") or v.Name == "Tree" then
+                            v:Destroy()
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
 
 -- Script & Teleport Utilities Core
 local ScriptToolSettings = {
@@ -95,10 +323,11 @@ local StatusSettings = {
 local DashboardSettings = {
     UIScale = 1,
     ThemeColor = "Hacker Orange",
-    UIPransparency = 0,
+    UITransparency = 0,
     NotificationSound = true,
     AutoExecuteBypass = true,
-    PerformanceMode = false
+    PerformanceMode = false,
+    MenuKeybind = Enum.KeyCode.RightControl
 }
 
 -- Touch State Engine
@@ -121,9 +350,9 @@ if gethui then
     ScreenGui.Parent = gethui()
 elseif syn and syn.protect_gui then
     syn.protect_gui(ScreenGui)
-    ScreenGui.Parent = game:GetService("CoreGui")
+    ScreenGui.Parent = CoreGui
 else
-    ScreenGui.Parent = (game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui"))
+    ScreenGui.Parent = (CoreGui or LocalPlayer:WaitForChild("PlayerGui"))
 end
 ScreenGui.ResetOnSpawn = false
 
@@ -219,7 +448,7 @@ local function GetClosestTarget()
     return ClosestPart
 end
 
--- ==================== PROFESSIONAL ESP MANAGEMENT ENGINE ====================
+-- ==================== STABLE PROFESSIONAL ESP MANAGEMENT ENGINE ====================
 local ESPRegistry = {}
 
 local function CreateDrawing(type, properties)
@@ -288,6 +517,19 @@ Players.PlayerRemoving:Connect(function(p)
     end
 end)
 
+local function HideESP(esp)
+    pcall(function()
+        esp.Box.Visible = false
+        esp.BoxFilled.Visible = false
+        esp.Name.Visible = false
+        esp.Distance.Visible = false
+        esp.HealthBarBg.Visible = false
+        esp.HealthBar.Visible = false
+        esp.Tracer.Visible = false
+        for _, line in ipairs(esp.SkeletonLines) do line.Visible = false end
+    end)
+end
+
 -- RenderStepped Loops
 RunService.RenderStepped:Connect(function()
     FOVCircle.Position = GetFOVCenter()
@@ -304,7 +546,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- Professional ESP Renderer Loop
+    -- Professional ESP Renderer Loop with Safety Checks
     for player, esp in pairs(ESPRegistry) do
         local char = player.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -321,151 +563,142 @@ RunService.RenderStepped:Connect(function()
             local distance = (Camera.CFrame.Position - hrp.Position).Magnitude
 
             if onScreen and distance <= ESPSettings.MaxDistance then
-                local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
-                local legPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
-                local height = math.abs(headPos.Y - legPos.Y)
-                local width = height / 2
-                local pos = Vector2.new(vector.X - width / 2, headPos.Y)
+                local headPos, headOnScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+                local legPos, legOnScreen = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+                
+                if headOnScreen and legOnScreen then
+                    local height = math.abs(headPos.Y - legPos.Y)
+                    local width = height / 2
+                    local pos = Vector2.new(vector.X - width / 2, headPos.Y)
 
-                -- 2D Box / Corner Box / Filled Box
-                if ESPSettings.Box then
-                    if ESPSettings.BoxStyle == "2D Box" then
-                        esp.Box.Visible = true
-                        esp.Box.Size = Vector2.new(width, height)
-                        esp.Box.Position = pos
-                        esp.Box.Color = currentThemeColor
+                    -- 2D Box / Corner Box / Filled Box
+                    if ESPSettings.Box then
+                        if ESPSettings.BoxStyle == "2D Box" then
+                            esp.Box.Visible = true
+                            esp.Box.Size = Vector2.new(width, height)
+                            esp.Box.Position = pos
+                            esp.Box.Color = currentThemeColor
+                            esp.BoxFilled.Visible = false
+                        elseif ESPSettings.BoxStyle == "Corner Box" then
+                            esp.Box.Visible = true
+                            esp.Box.Size = Vector2.new(width, height)
+                            esp.Box.Position = pos
+                            esp.Box.Color = currentThemeColor
+                            esp.BoxFilled.Visible = false
+                        elseif ESPSettings.BoxStyle == "Filled Box" then
+                            esp.Box.Visible = true
+                            esp.Box.Size = Vector2.new(width, height)
+                            esp.Box.Position = pos
+                            esp.Box.Color = currentThemeColor
+                            esp.BoxFilled.Visible = true
+                            esp.BoxFilled.Size = Vector2.new(width, height)
+                            esp.BoxFilled.Position = pos
+                        end
+                    else
+                        esp.Box.Visible = false
                         esp.BoxFilled.Visible = false
-                    elseif ESPSettings.BoxStyle == "Corner Box" then
-                        esp.Box.Visible = true
-                        esp.Box.Size = Vector2.new(width, height)
-                        esp.Box.Position = pos
-                        esp.Box.Color = currentThemeColor
-                        esp.BoxFilled.Visible = false
-                    elseif ESPSettings.BoxStyle == "Filled Box" then
-                        esp.Box.Visible = true
-                        esp.Box.Size = Vector2.new(width, height)
-                        esp.Box.Position = pos
-                        esp.Box.Color = currentThemeColor
-                        esp.BoxFilled.Visible = true
-                        esp.BoxFilled.Size = Vector2.new(width, height)
-                        esp.BoxFilled.Position = pos
                     end
-                else
-                    esp.Box.Visible = false
-                    esp.BoxFilled.Visible = false
-                end
 
-                -- Name ESP
-                if ESPSettings.Name then
-                    esp.Name.Visible = true
-                    esp.Name.Text = player.Name
-                    esp.Name.Position = Vector2.new(vector.X, pos.Y - 15)
-                    esp.Name.Color = ESPSettings.NameColor
-                else
-                    esp.Name.Visible = false
-                end
-
-                -- Distance ESP
-                if ESPSettings.Distance then
-                    esp.Distance.Visible = true
-                    esp.Distance.Text = string.format("[%dft]", math.floor(distance))
-                    esp.Distance.Position = Vector2.new(vector.X, pos.Y + height + 2)
-                    esp.Distance.Color = Color3.fromRGB(200, 200, 200)
-                else
-                    esp.Distance.Visible = false
-                end
-
-                -- Health Bar
-                if ESPSettings.HealthBar then
-                    local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
-                    esp.HealthBarBg.Visible = true
-                    esp.HealthBarBg.Size = Vector2.new(3, height + 2)
-                    esp.HealthBarBg.Position = Vector2.new(pos.X - 6, pos.Y - 1)
-
-                    esp.HealthBar.Visible = true
-                    esp.HealthBar.Size = Vector2.new(1, (height * healthPercent))
-                    esp.HealthBar.Position = Vector2.new(pos.X - 5, pos.Y + (height * (1 - healthPercent)))
-                    esp.HealthBar.Color = Color3.fromRGB(255 - (healthPercent * 255), healthPercent * 255, 0)
-                else
-                    esp.HealthBarBg.Visible = false
-                    esp.HealthBar.Visible = false
-                end
-
-                -- Tracers
-                if ESPSettings.Tracers then
-                    esp.Tracer.Visible = true
-                    local origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
-                    if ESPSettings.TracerOrigin == "Center" then
-                        origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-                    elseif ESPSettings.TracerOrigin == "Mouse" then
-                        origin = UserInputService:GetMouseLocation()
+                    -- Name ESP
+                    if ESPSettings.Name then
+                        esp.Name.Visible = true
+                        esp.Name.Text = player.Name
+                        esp.Name.Position = Vector2.new(vector.X, pos.Y - 15)
+                        esp.Name.Color = ESPSettings.NameColor
+                    else
+                        esp.Name.Visible = false
                     end
-                    esp.Tracer.From = origin
-                    esp.Tracer.To = Vector2.new(vector.X, pos.Y + height)
-                    esp.Tracer.Color = currentThemeColor
-                else
-                    esp.Tracer.Visible = false
-                end
 
-                -- Skeleton ESP
-                if ESPSettings.Skeleton and char:FindFirstChild("Head") and char:FindFirstChild("UpperTorso") then
-                    local joints = {
-                        {"Head", "UpperTorso"},
-                        {"UpperTorso", "LowerTorso"},
-                        {"UpperTorso", "LeftUpperArm"},
-                        {"LeftUpperArm", "LeftLowerArm"},
-                        {"LeftLowerArm", "LeftHand"},
-                        {"UpperTorso", "RightUpperArm"},
-                        {"RightUpperArm", "RightLowerArm"},
-                        {"RightLowerArm", "RightHand"},
-                        {"LowerTorso", "LeftUpperLeg"},
-                        {"LeftUpperLeg", "LeftLowerLeg"},
-                        {"LeftLowerLeg", "LeftFoot"},
-                        {"LowerTorso", "RightUpperLeg"},
-                        {"RightUpperLeg", "RightLowerLeg"},
-                        {"RightLowerLeg", "RightFoot"}
-                    }
-                    for i, joint in ipairs(joints) do
-                        local p1 = char:FindFirstChild(joint[1])
-                        local p2 = char:FindFirstChild(joint[2])
-                        local line = esp.SkeletonLines[i]
-                        if p1 and p2 and line then
-                            local v1, vis1 = Camera:WorldToViewportPoint(p1.Position)
-                            local v2, vis2 = Camera:WorldToViewportPoint(p2.Position)
-                            if vis1 and vis2 then
-                                line.Visible = true
-                                line.From = Vector2.new(v1.X, v1.Y)
-                                line.To = Vector2.new(v2.X, v2.Y)
-                                line.Color = currentThemeColor
-                            else
+                    -- Distance ESP
+                    if ESPSettings.Distance then
+                        esp.Distance.Visible = true
+                        esp.Distance.Text = string.format("[%dft]", math.floor(distance))
+                        esp.Distance.Position = Vector2.new(vector.X, pos.Y + height + 2)
+                        esp.Distance.Color = Color3.fromRGB(200, 200, 200)
+                    else
+                        esp.Distance.Visible = false
+                    end
+
+                    -- Health Bar
+                    if ESPSettings.HealthBar then
+                        local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+                        esp.HealthBarBg.Visible = true
+                        esp.HealthBarBg.Size = Vector2.new(3, height + 2)
+                        esp.HealthBarBg.Position = Vector2.new(pos.X - 6, pos.Y - 1)
+
+                        esp.HealthBar.Visible = true
+                        esp.HealthBar.Size = Vector2.new(1, (height * healthPercent))
+                        esp.HealthBar.Position = Vector2.new(pos.X - 5, pos.Y + (height * (1 - healthPercent)))
+                        esp.HealthBar.Color = Color3.fromRGB(255 - (healthPercent * 255), healthPercent * 255, 0)
+                    else
+                        esp.HealthBarBg.Visible = false
+                        esp.HealthBar.Visible = false
+                    end
+
+                    -- Tracers
+                    if ESPSettings.Tracers then
+                        esp.Tracer.Visible = true
+                        local origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                        if ESPSettings.TracerOrigin == "Center" then
+                            origin = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+                        elseif ESPSettings.TracerOrigin == "Mouse" then
+                            origin = UserInputService:GetMouseLocation()
+                        end
+                        esp.Tracer.From = origin
+                        esp.Tracer.To = Vector2.new(vector.X, pos.Y + height)
+                        esp.Tracer.Color = currentThemeColor
+                    else
+                        esp.Tracer.Visible = false
+                    end
+
+                    -- Skeleton ESP
+                    if ESPSettings.Skeleton and char:FindFirstChild("Head") and char:FindFirstChild("UpperTorso") then
+                        local joints = {
+                            {"Head", "UpperTorso"},
+                            {"UpperTorso", "LowerTorso"},
+                            {"UpperTorso", "LeftUpperArm"},
+                            {"LeftUpperArm", "LeftLowerArm"},
+                            {"LeftLowerArm", "LeftHand"},
+                            {"UpperTorso", "RightUpperArm"},
+                            {"RightUpperArm", "RightLowerArm"},
+                            {"RightLowerArm", "RightHand"},
+                            {"LowerTorso", "LeftUpperLeg"},
+                            {"LeftUpperLeg", "LeftLowerLeg"},
+                            {"LeftLowerLeg", "LeftFoot"},
+                            {"LowerTorso", "RightUpperLeg"},
+                            {"RightUpperLeg", "RightLowerLeg"},
+                            {"RightLowerLeg", "RightFoot"}
+                        }
+                        for i, joint in ipairs(joints) do
+                            local p1 = char:FindFirstChild(joint[1])
+                            local p2 = char:FindFirstChild(joint[2])
+                            local line = esp.SkeletonLines[i]
+                            if p1 and p2 and line then
+                                local v1, vis1 = Camera:WorldToViewportPoint(p1.Position)
+                                local v2, vis2 = Camera:WorldToViewportPoint(p2.Position)
+                                if vis1 and vis2 then
+                                    line.Visible = true
+                                    line.From = Vector2.new(v1.X, v1.Y)
+                                    line.To = Vector2.new(v2.X, v2.Y)
+                                    line.Color = currentThemeColor
+                                else
+                                    line.Visible = false
+                                end
+                            elseif line then
                                 line.Visible = false
                             end
-                        elseif line then
-                            line.Visible = false
                         end
+                    else
+                        for _, line in ipairs(esp.SkeletonLines) do line.Visible = false end
                     end
                 else
-                    for _, line in ipairs(esp.SkeletonLines) do line.Visible = false end
+                    HideESP(esp)
                 end
             else
-                esp.Box.Visible = false
-                esp.BoxFilled.Visible = false
-                esp.Name.Visible = false
-                esp.Distance.Visible = false
-                esp.HealthBarBg.Visible = false
-                esp.HealthBar.Visible = false
-                esp.Tracer.Visible = false
-                for _, line in ipairs(esp.SkeletonLines) do line.Visible = false end
+                HideESP(esp)
             end
         else
-            esp.Box.Visible = false
-            esp.BoxFilled.Visible = false
-            esp.Name.Visible = false
-            esp.Distance.Visible = false
-            esp.HealthBarBg.Visible = false
-            esp.HealthBar.Visible = false
-            esp.Tracer.Visible = false
-            for _, line in ipairs(esp.SkeletonLines) do line.Visible = false end
+            HideESP(esp)
         end
     end
 
@@ -476,6 +709,35 @@ RunService.RenderStepped:Connect(function()
                 part.CanCollide = false
             end
         end
+    end
+
+    -- Universal Cross-Platform Fly Engine Loop (Fixed Camera-locked & Stiff Movement)
+    if AdvancedMovementEngine.FlyEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local HRP = LocalPlayer.Character.HumanoidRootPart
+        local Hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        local CamCF = Camera.CFrame
+        local MoveVector = Vector3.new()
+
+        -- Keyboard Controls
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then MoveVector = MoveVector + CamCF.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then MoveVector = MoveVector - CamCF.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then MoveVector = MoveVector - CamCF.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then MoveVector = MoveVector + CamCF.RightVector end
+
+        -- Mobile / Humanoid MoveDirection Fallback (Works with Thumbstick)
+        if Hum and Hum.MoveDirection.Magnitude > 0 then
+            local flatLook = Vector3.new(CamCF.LookVector.X, 0, CamCF.LookVector.Z).Unit
+            local flatRight = Vector3.new(CamCF.RightVector.X, 0, CamCF.RightVector.Z).Unit
+            MoveVector = MoveVector + (flatLook * Hum.MoveDirection.Z + flatRight * Hum.MoveDirection.X)
+        end
+
+        if MoveVector.Magnitude > 0 then
+            MoveVector = MoveVector.Unit
+        end
+
+        HRP.AssemblyLinearVelocity = MoveVector * AdvancedMovementEngine.FlySpeed
+        HRP.AssemblyAngularVelocity = Vector3.new(0, 0, 0)
+        HRP.CFrame = CFrame.new(HRP.Position, HRP.Position + Vector3.new(CamCF.LookVector.X, 0, CamCF.LookVector.Z))
     end
 end)
 
@@ -514,6 +776,16 @@ RunService.Heartbeat:Connect(function()
             Part.Color = AimLockSettings.FOVColor
             Part.Material = Enum.Material.ForceField
             Part.CanCollide = false
+        end
+    end
+end)
+
+-- Infinite Jump Listener
+UserInputService.JumpRequest:Connect(function()
+    if AdvancedMovementEngine.InfiniteJump and LocalPlayer.Character then
+        local Hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if Hum then
+            Hum:ChangeState(Enum.HumanoidStateType.Jumping)
         end
     end
 end)
@@ -610,7 +882,7 @@ task.spawn(function()
                 local targets = {}
                 local searchFolders = {
                     workspace:FindFirstChild("AreaEggSlotsClient"),
-                    game:GetService("ReplicatedStorage"):FindFirstChild("AreaEggSlotsClient"),
+                    ReplicatedStorage:FindFirstChild("AreaEggSlotsClient"),
                     workspace
                 }
 
@@ -765,17 +1037,17 @@ local function CreatePage(pageName)
     Page.Size = UDim2.new(1, 0, 1, 0)
     Page.BackgroundTransparency = 1
     Page.Visible = false
-    Page.CanvasSize = UDim2.new(0, 0, 0, 360)
+    Page.CanvasSize = UDim2.new(0, 0, 0, 520)
     Page.ScrollBarThickness = 3
     Page.Parent = PagesFolder
     Pages[pageName] = Page
     return Page
 end
 
-local CombatPage = CreatePage("Combat")
-local PlayerPage = CreatePage("Player")
+local MainNavPage = CreatePage("Main")
+local BloxSpinPage = CreatePage("BloxSpin")
 local StealEggPage = CreatePage("Steal An Egg")
-local VisualsPage = CreatePage("Visuals")
+local TSBPage = CreatePage("TSB")
 local SettingsPage = CreatePage("Settings")
 
 local currentTab = nil
@@ -806,7 +1078,7 @@ local function SwitchTab(tabName)
     end
 end
 
-local tabNames = {"Combat", "Player", "Steal An Egg", "Visuals", "Settings"}
+local tabNames = {"Main", "BloxSpin", "Steal An Egg", "TSB", "Settings"}
 for i, name in ipairs(tabNames) do
     local Btn = Instance.new("TextButton")
     Btn.Size = UDim2.new(1, -16, 0, 24)
@@ -1057,45 +1329,27 @@ local function AddButton(parent, yPos, text, callback)
     end)
 end
 
--- ==================== COMBAT PAGE ====================
-local AimSec = CreateSection(CombatPage, "Aim Assist & Locks", UDim2.new(0, 165, 0, 260), UDim2.new(0, 5, 0, 10))
-AddToggle(AimSec, 24, "Camera Aim Lock", AimLockSettings.Enabled, function(val) AimLockSettings.Enabled = val end)
-AddToggle(AimSec, 40, "Silent Aim (Bullet Direct)", SilentAimSettings.Enabled, function(val) SilentAimSettings.Enabled = val end)
-AddSlider(AimSec, 58, "Camera Smoothness", 0.01, 0.5, AimLockSettings.Smoothness, function(val) AimLockSettings.Smoothness = val end)
-AddToggle(AimSec, 88, "Show FOV Circle", AimLockSettings.ShowFOV, function(val) AimLockSettings.ShowFOV = val end)
-AddSlider(AimSec, 104, "FOV Radius", 10, 500, AimLockSettings.FOV, function(val) AimLockSettings.FOV = val end)
-
-AddDropdown(AimSec, 134, {"All Targets", "Players Only", "NPCs / Dummies"}, function(selected)
-    AimLockSettings.TargetFilterMode = selected
-end)
-
-AddToggle(AimSec, 156, "Only Target Inside FOV", AimLockSettings.OnlyInsideFOV, function(val) AimLockSettings.OnlyInsideFOV = val end)
-AddToggle(AimSec, 172, "Wall Check", AimLockSettings.WallCheck, function(val) AimLockSettings.WallCheck = val end)
-AddToggle(AimSec, 188, "Team Check", AimLockSettings.TeamCheck, function(val) AimLockSettings.TeamCheck = val end)
-
-local HitboxSec = CreateSection(CombatPage, "Custom Hitbox", UDim2.new(0, 165, 0, 260), UDim2.new(0, 175, 0, 10))
-AddToggle(HitboxSec, 26, "Enable Hitbox", HitboxSettings.Enabled, function(val) HitboxSettings.Enabled = val end)
-AddDropdown(HitboxSec, 45, {"HumanoidRootPart", "Head", "Torso"}, function(selected) HitboxSettings.TargetPart = selected end)
-AddSlider(HitboxSec, 72, "Hitbox Size", 2, 100, HitboxSettings.Size, function(val) HitboxSettings.Size = val end)
-
--- ==================== PLAYER PAGE (UPDATED WITH SCRIPT TOOLS & TELEPORT) ====================
-local SpeedSec = CreateSection(PlayerPage, "Movement & NoClip", UDim2.new(0, 165, 0, 260), UDim2.new(0, 5, 0, 10))
+-- ==================== MAIN PAGE (FORMERLY PLAYER) ====================
+local SpeedSec = CreateSection(MainNavPage, "Movement & NoClip", UDim2.new(0, 165, 0, 320), UDim2.new(0, 5, 0, 10))
 AddToggle(SpeedSec, 24, "Enable Speed", AdvancedMovementEngine.SpeedEnabled, function(val) AdvancedMovementEngine.SpeedEnabled = val end)
 AddSlider(SpeedSec, 42, "WalkSpeed", 16, 300, AdvancedMovementEngine.WalkSpeed, function(val) AdvancedMovementEngine.WalkSpeed = val end)
 AddToggle(SpeedSec, 78, "Enable Jump", AdvancedMovementEngine.JumpEnabled, function(val) AdvancedMovementEngine.JumpEnabled = val end)
 AddSlider(SpeedSec, 96, "JumpPower", 50, 500, AdvancedMovementEngine.JumpPower, function(val) AdvancedMovementEngine.JumpPower = val end)
-AddToggle(SpeedSec, 132, "Enable NoClip (Walk Through Walls)", AdvancedMovementEngine.NoClip, function(val) AdvancedMovementEngine.NoClip = val end)
-AddToggle(SpeedSec, 152, "Bypass Detection Hook", AdvancedMovementEngine.BypassDetection, function(val) AdvancedMovementEngine.BypassDetection = val end)
-AddButton(SpeedSec, 178, "Reset Character", function()
+AddToggle(SpeedSec, 132, "Infinite Jump", AdvancedMovementEngine.InfiniteJump, function(val) AdvancedMovementEngine.InfiniteJump = val end)
+AddToggle(SpeedSec, 152, "Enable Fly (Cross-Platform)", AdvancedMovementEngine.FlyEnabled, function(val) AdvancedMovementEngine.FlyEnabled = val end)
+AddSlider(SpeedSec, 170, "Fly Speed", 16, 300, AdvancedMovementEngine.FlySpeed, function(val) AdvancedMovementEngine.FlySpeed = val end)
+AddToggle(SpeedSec, 206, "Enable NoClip (Walls)", AdvancedMovementEngine.NoClip, function(val) AdvancedMovementEngine.NoClip = val end)
+AddToggle(SpeedSec, 226, "Bypass Detection Hook", AdvancedMovementEngine.BypassDetection, function(val) AdvancedMovementEngine.BypassDetection = val end)
+AddButton(SpeedSec, 252, "Reset Character", function()
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
         LocalPlayer.Character:FindFirstChildOfClass("Humanoid").Health = 0
     end
 end)
-AddButton(SpeedSec, 204, "Rejoin Server", function()
+AddButton(SpeedSec, 278, "Rejoin Server", function()
     TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
 end)
 
-local ScriptTeleportSec = CreateSection(PlayerPage, "Script Tools & CFrame Teleport", UDim2.new(0, 165, 0, 260), UDim2.new(0, 175, 0, 10))
+local ScriptTeleportSec = CreateSection(MainNavPage, "Script Tools & CFrame Teleport", UDim2.new(0, 165, 0, 320), UDim2.new(0, 175, 0, 10))
 
 local CFrameLabel = Instance.new("TextLabel")
 CFrameLabel.Size = UDim2.new(1, -20, 0, 22)
@@ -1159,9 +1413,56 @@ AddButton(ScriptTeleportSec, 182, "Launch Infinite Yield", function()
     end)
 end)
 
-AddButton(ScriptTeleportSec, 208, "Open Script Hub UI", function()
-    for _, btn in pairs(TabButtons) do end
+AddButton(ScriptTeleportSec, 208, "Full Bright (Lighting)", function()
+    pcall(function()
+        local Lighting = game:GetService("Lighting")
+        Lighting.Brightness = 2
+        Lighting.ClockTime = 14
+        Lighting.FogEnd = 100000
+        Lighting.GlobalShadows = false
+    end)
 end)
+
+AddButton(ScriptTeleportSec, 234, "FPS Unlocker (Max)", function()
+    pcall(function()
+        if setfpscap then setfpscap(999) end
+    end)
+end)
+
+-- ==================== BLOXSPIN PAGE ====================
+local AimSec = CreateSection(BloxSpinPage, "Aim Assist & Locks", UDim2.new(0, 165, 0, 260), UDim2.new(0, 5, 0, 10))
+AddToggle(AimSec, 24, "Camera Aim Lock", AimLockSettings.Enabled, function(val) AimLockSettings.Enabled = val end)
+AddToggle(AimSec, 40, "Silent Aim (Bullet Direct)", SilentAimSettings.Enabled, function(val) SilentAimSettings.Enabled = val end)
+AddSlider(AimSec, 58, "Camera Smoothness", 0.01, 0.5, AimLockSettings.Smoothness, function(val) AimLockSettings.Smoothness = val end)
+AddToggle(AimSec, 88, "Show FOV Circle", AimLockSettings.ShowFOV, function(val) AimLockSettings.ShowFOV = val end)
+AddSlider(AimSec, 104, "FOV Radius", 10, 500, AimLockSettings.FOV, function(val) AimLockSettings.FOV = val end)
+
+AddDropdown(AimSec, 134, {"All Targets", "Players Only", "NPCs / Dummies"}, function(selected)
+    AimLockSettings.TargetFilterMode = selected
+end)
+
+AddToggle(AimSec, 156, "Only Target Inside FOV", AimLockSettings.OnlyInsideFOV, function(val) AimLockSettings.OnlyInsideFOV = val end)
+AddToggle(AimSec, 172, "Wall Check", AimLockSettings.WallCheck, function(val) AimLockSettings.WallCheck = val end)
+AddToggle(AimSec, 188, "Team Check", AimLockSettings.TeamCheck, function(val) AimLockSettings.TeamCheck = val end)
+
+-- Comprehensive BloxSpin ESP Section
+local BloxSpinESPSec = CreateSection(BloxSpinPage, "BloxSpin ESP Suite", UDim2.new(0, 165, 0, 360), UDim2.new(0, 175, 0, 10))
+AddToggle(BloxSpinESPSec, 26, "Enable Master ESP Engine", ESPSettings.Enabled, function(val) ESPSettings.Enabled = val end)
+AddToggle(BloxSpinESPSec, 44, "Box ESP", ESPSettings.Box, function(val) ESPSettings.Box = val end)
+AddDropdown(BloxSpinESPSec, 62, {"2D Box", "Corner Box", "Filled Box"}, function(selected) ESPSettings.BoxStyle = selected end)
+AddToggle(BloxSpinESPSec, 90, "Name ESP", ESPSettings.Name, function(val) ESPSettings.Name = val end)
+AddToggle(BloxSpinESPSec, 108, "Health Bar ESP", ESPSettings.HealthBar, function(val) ESPSettings.HealthBar = val end)
+AddToggle(BloxSpinESPSec, 126, "Distance ESP", ESPSettings.Distance, function(val) ESPSettings.Distance = val end)
+AddToggle(BloxSpinESPSec, 144, "Skeleton ESP", ESPSettings.Skeleton, function(val) ESPSettings.Skeleton = val end)
+AddToggle(BloxSpinESPSec, 162, "Tracers Lines", ESPSettings.Tracers, function(val) ESPSettings.Tracers = val end)
+AddDropdown(BloxSpinESPSec, 180, {"Bottom", "Center", "Mouse"}, function(selected) ESPSettings.TracerOrigin = selected end)
+AddToggle(BloxSpinESPSec, 210, "Team Check", ESPSettings.TeamCheck, function(val) ESPSettings.TeamCheck = val end)
+AddSlider(BloxSpinESPSec, 230, "Max ESP Distance", 100, 5000, ESPSettings.MaxDistance, function(val) ESPSettings.MaxDistance = val end)
+
+local HitboxSec = CreateSection(BloxSpinPage, "Custom Hitbox", UDim2.new(0, 165, 0, 120), UDim2.new(0, 5, 0, 280))
+AddToggle(HitboxSec, 26, "Enable Hitbox", HitboxSettings.Enabled, function(val) HitboxSettings.Enabled = val end)
+AddDropdown(HitboxSec, 45, {"HumanoidRootPart", "Head", "Torso"}, function(selected) HitboxSettings.TargetPart = selected end)
+AddSlider(HitboxSec, 72, "Hitbox Size", 2, 100, HitboxSettings.Size, function(val) HitboxSettings.Size = val end)
 
 -- ==================== STEAL AN EGG PAGE ====================
 local StealEggSec = CreateSection(StealEggPage, "AreaEggSlotsClient Steal Egg", UDim2.new(0, 333, 0, 260), UDim2.new(0, 5, 0, 10))
@@ -1188,22 +1489,22 @@ AddButton(StealEggSec, 115, "Re-Spawn Character (Humanoid Reset)", function()
     ReSpawnCharacter(StealEggSettings.WarpSpeed)
 end)
 
--- ==================== VISUALS PAGE (PROFESSIONAL ESP CATEGORIES) ====================
-local VisualSec = CreateSection(VisualsPage, "Comprehensive ESP Management", UDim2.new(0, 333, 0, 330), UDim2.new(0, 5, 0, 10))
+-- ==================== TSB PAGE ====================
+local TSBMainSec = CreateSection(TSBPage, "TSB Combat & Lock Logic", UDim2.new(0, 333, 0, 320), UDim2.new(0, 5, 0, 10))
+AddToggle(TSBMainSec, 24, "Zigzag Lock", TSBSettings.ZigzagEnabled, function(val) TSBSettings.ZigzagEnabled = val end)
+AddToggle(TSBMainSec, 44, "Tech Sub", TSBSettings.TechSubEnabled, function(val) TSBSettings.TechSubEnabled = val end)
+AddToggle(TSBMainSec, 64, "Normal Lock", TSBSettings.NormalEnabled, function(val) TSBSettings.NormalEnabled = val end)
+AddToggle(TSBMainSec, 84, "Spin Lock", TSBSettings.SpinEnabled, function(val) TSBSettings.SpinEnabled = val end)
+AddToggle(TSBMainSec, 104, "Smooth Aimbot", TSBSettings.AimbotEnabled, function(val) TSBSettings.AimbotEnabled = val end)
+AddToggle(TSBMainSec, 124, "Auto FPS Boost", TSBSettings.AutoFpsBoost, function(val) TSBSettings.AutoFpsBoost = val end)
 
-AddToggle(VisualSec, 26, "Enable Master ESP Engine", ESPSettings.Enabled, function(val) ESPSettings.Enabled = val end)
-AddToggle(VisualSec, 44, "Box ESP", ESPSettings.Box, function(val) ESPSettings.Box = val end)
-AddDropdown(VisualSec, 62, {"2D Box", "Corner Box", "Filled Box"}, function(selected) ESPSettings.BoxStyle = selected end)
+AddDropdown(TSBMainSec, 150, {"All Targets", "Players Only", "NPCs / Dummies"}, function(selected)
+    if selected == "All Targets" then TSBSettings.TargetMode = 1
+    elseif selected == "Players Only" then TSBSettings.TargetMode = 2
+    elseif selected == "NPCs / Dummies" then TSBSettings.TargetMode = 3 end
+end)
 
-AddToggle(VisualSec, 90, "Name ESP", ESPSettings.Name, function(val) ESPSettings.Name = val end)
-AddToggle(VisualSec, 108, "Health Bar ESP", ESPSettings.HealthBar, function(val) ESPSettings.HealthBar = val end)
-AddToggle(VisualSec, 126, "Distance ESP", ESPSettings.Distance, function(val) ESPSettings.Distance = val end)
-AddToggle(VisualSec, 144, "Skeleton ESP", ESPSettings.Skeleton, function(val) ESPSettings.Skeleton = val end)
-AddToggle(VisualSec, 162, "Tracers Lines", ESPSettings.Tracers, function(val) ESPSettings.Tracers = val end)
-AddDropdown(VisualSec, 180, {"Bottom", "Center", "Mouse"}, function(selected) ESPSettings.TracerOrigin = selected end)
-
-AddToggle(VisualSec, 210, "Team Check", ESPSettings.TeamCheck, function(val) ESPSettings.TeamCheck = val end)
-AddSlider(VisualSec, 230, "Max ESP Distance", 100, 5000, ESPSettings.MaxDistance, function(val) ESPSettings.MaxDistance = val end)
+AddSlider(TSBMainSec, 185, "Lock Duration", 0.1, 3.0, TSBSettings.LockDuration, function(val) TSBSettings.LockDuration = val end)
 
 -- ==================== SETTINGS PAGE ====================
 local GeneralUISec = CreateSection(SettingsPage, "Interface Display & Status", UDim2.new(0, 165, 0, 260), UDim2.new(0, 5, 0, 10))
@@ -1219,10 +1520,16 @@ AddDropdown(GeneralUISec, 68, {"Hacker Orange", "Cyber Red", "Neon Purple"}, fun
     ToggleBtn.BackgroundColor3 = newColor
 end)
 
-AddToggle(GeneralUISec, 95, "Show Status Bar Widget", true, function(state) StatusBar.Visible = state end)
-AddToggle(GeneralUISec, 115, "Display FPS Stats", StatusSettings.ShowFps, function(v) StatusSettings.ShowFps = v end)
-AddToggle(GeneralUISec, 135, "Display Ping Monitor", StatusSettings.ShowPing, function(v) StatusSettings.ShowPing = v end)
-AddToggle(GeneralUISec, 155, "Display Server Type", StatusSettings.ShowServer, function(v) StatusSettings.ShowServer = v end)
+AddSlider(GeneralUISec, 95, "UI Transparency", 0, 0.8, DashboardSettings.UITransparency, function(val)
+    DashboardSettings.UITransparency = val
+    MainFrame.BackgroundTransparency = val
+    SideBar.BackgroundTransparency = val
+end)
+
+AddToggle(GeneralUISec, 125, "Show Status Bar Widget", true, function(state) StatusBar.Visible = state end)
+AddToggle(GeneralUISec, 145, "Display FPS Stats", StatusSettings.ShowFps, function(v) StatusSettings.ShowFps = v end)
+AddToggle(GeneralUISec, 165, "Display Ping Monitor", StatusSettings.ShowPing, function(v) StatusSettings.ShowPing = v end)
+AddToggle(GeneralUISec, 185, "Display Server Type", StatusSettings.ShowServer, function(v) StatusSettings.ShowServer = v end)
 
 local AdvancedSec = CreateSection(SettingsPage, "Advanced Config & Engine", UDim2.new(0, 165, 0, 260), UDim2.new(0, 175, 0, 10))
 AddToggle(AdvancedSec, 26, "Bypass Speed Detection", AdvancedMovementEngine.BypassDetection, function(state) AdvancedMovementEngine.BypassDetection = state end)
@@ -1244,7 +1551,11 @@ AddButton(AdvancedSec, 115, "Copy Discord Invite", function()
     if setclipboard then setclipboard("https://discord.gg/simplespy") end
 end)
 
-AddButton(AdvancedSec, 145, "Unload Script UI", function()
+AddButton(AdvancedSec, 145, "Toggle UI Visibility (Hide/Show)", function()
+    ToggleMainUI()
+end)
+
+AddButton(AdvancedSec, 175, "Unload Script UI", function()
     ScreenGui:Destroy()
     FOVCircle:Remove()
     for _, esp in pairs(ESPRegistry) do
@@ -1261,7 +1572,7 @@ AddButton(AdvancedSec, 145, "Unload Script UI", function()
     end
 end)
 
-SwitchTab("Combat")
+SwitchTab("Main")
 
 -- Animated UI Toggle System
 local uiVisible = false
@@ -1310,7 +1621,7 @@ end
 ToggleBtn.MouseButton1Click:Connect(ToggleMainUI)
 
 UserInputService.InputBegan:Connect(function(input, gpe)
-    if not gpe and input.KeyCode == Enum.KeyCode.RightControl then
+    if not gpe and input.KeyCode == DashboardSettings.MenuKeybind then
         ToggleMainUI()
     end
 end)
