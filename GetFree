@@ -80,6 +80,304 @@ local StealEggSettings = {
     ReturnCFrame = CFrame.new(517.982666, 70.7262878, -355.470642, 1, 0, 0, 0, 1, 0, 0, 0, 1)
 }
 
+-- Grass Incremental Simulator Settings
+local GrassSimulatorSettings = {
+    AutoGrassNormalEnabled = false,
+    AutoGrassDiamondEnabled = false,
+    AutoUpgradeEnabled = false,
+    AutoRebirthEnabled = false,
+    WalkSpeedEnabled = false
+}
+
+-- [[ GOD MODE V6: GLOVE-ONLY WARP (NO CHARACTER MOVEMENT) ]] --
+-- [[ Created by ffsww_1007 ]] --
+
+local _G = {
+    AutoClick = false,
+    KillAura = false,
+    AutoFarm = false, 
+    AntiVoid = true,
+    FarmRange = 99999,
+    HitboxSize = 20,
+    AntiLag = true,
+    -- RSX Core Variables
+    AutoCam = false,
+    Silent = false,
+    SkyHunter = false,
+    Spin = false,
+    ZigZag = false,
+    SpeedHack = false,
+    AimPart = "Head"
+}
+
+-- [[ RSX CORE LOGIC INTEGRATION ]] --
+RunService.RenderStepped:Connect(function()
+    if _G.AutoCam then
+        LocalPlayer.CameraMode = Enum.CameraMode.Classic
+        LocalPlayer.DevComputerCameraMode = Enum.DevComputerCameraMode.Classic
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if _G.Silent then
+        local target = nil
+        local dist = math.huge
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild(_G.AimPart) then
+                local d = (p.Character[_G.AimPart].Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                if d < dist then target = p.Character[_G.AimPart] dist = d end
+            end
+        end
+        if target then workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, target.Position) end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if _G.SkyHunter then
+            local targetPlayer = nil
+            local dist = math.huge
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 and p.Character:FindFirstChild("Head") then
+                    local d = (p.Character.Head.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                    if d < dist then targetPlayer = p.Character.Head dist = d end
+                end
+            end
+            if targetPlayer then
+                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(0, -50, 0)
+                workspace.CurrentCamera.CameraSubject = targetPlayer
+            end
+        else
+            if workspace.CurrentCamera.CameraSubject ~= LocalPlayer.Character and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+                workspace.CurrentCamera.CameraSubject = LocalPlayer.Character.Humanoid
+            end
+        end
+        task.wait(0.1)
+    end
+end)
+
+RunService.Stepped:Connect(function()
+    if _G.SkyHunter and LocalPlayer.Character then
+        for _, v in pairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = false
+            end
+        end
+    end
+end)
+
+RunService.Heartbeat:Connect(function()
+    if _G.SkyHunter and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        if LocalPlayer.Character.HumanoidRootPart.Position.Y > -40 then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(LocalPlayer.Character.HumanoidRootPart.Position.X, -50, LocalPlayer.Character.HumanoidRootPart.Position.Z)
+        end
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if _G.Spin and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(_G.SpinSpeed or 45), 0)
+        end
+        task.wait()
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if _G.ZigZag and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(30), 0)
+            task.wait(0.05)
+            LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.Angles(0, math.rad(-30), 0)
+            task.wait(0.05)
+        end
+        task.wait()
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        LocalPlayer.Character.Humanoid.WalkSpeed = _G.SpeedHack and (_G.CustomWalkSpeed or 50) or 16
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if _G.AutoClick then
+            pcall(function()
+                local glovesCont = LocalPlayer:WaitForChild("PlayerGui"):FindFirstChild("GlovesCont")
+                if glovesCont then
+                    local buttons = glovesCont:FindFirstChild("Buttons")
+                    local btn = buttons and buttons:FindFirstChild("KillstreakBtn")
+                    if btn then
+                        if typeof(firesignal) == "function" then
+                            pcall(function() firesignal(btn.MouseButton1Click) end)
+                            pcall(function() firesignal(btn.MouseButton1Down) end)
+                            pcall(function() firesignal(btn.Activated) end)
+                        end
+                        for _, v in pairs(btn:GetDescendants()) do
+                            if v:IsA("RemoteEvent") then pcall(function() v:FireServer() end) end
+                        end
+                    end
+                end
+            end)
+        end
+        task.wait()
+    end
+end)
+
+local function ExpandHitbox(targetChar)
+    pcall(function()
+        local hrp = targetChar:FindFirstChild("HumanoidRootPart")
+        if hrp and not hrp:FindFirstChild("HaxHitbox") then
+            local p = Instance.new("Part")
+            p.Name = "HaxHitbox"
+            p.Size = Vector3.new(_G.HitboxSize, _G.HitboxSize, _G.HitboxSize)
+            p.Transparency = 0.7
+            p.Color = Color3.fromRGB(255, 0, 0)
+            p.CanCollide = false
+            p.Parent = hrp
+            local w = Instance.new("WeldConstraint", p)
+            w.Part0 = hrp
+            w.Part1 = p
+            
+            task.spawn(function()
+                local hum = targetChar:FindFirstChild("Humanoid")
+                if hum then
+                    hum.Died:Wait()
+                    if p then p:Destroy() end
+                end
+            end)
+        end
+    end)
+end
+
+RunService.Stepped:Connect(function()
+    if _G.KillAura or _G.AutoFarm then
+        pcall(function()
+            local char = LocalPlayer.Character
+            local tool = char and char:FindFirstChildOfClass("Tool")
+            
+            if tool and tool:FindFirstChild("Handle") then
+                tool.Handle.Massless = true
+                tool.Handle.CanCollide = false
+                
+                local rightGrip = char:FindFirstChild("RightGrip", true)
+                if rightGrip then rightGrip.Enabled = false end
+
+                local Target = nil
+                local CurrentMaxDist = _G.FarmRange
+
+                for _, v in pairs(Players:GetPlayers()) do
+                    if v ~= LocalPlayer and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChildOfClass("Humanoid") and v.Character.Humanoid.Health > 0 then
+                        local dist = (char.HumanoidRootPart.Position - v.Character.HumanoidRootPart.Position).Magnitude
+                        if dist < CurrentMaxDist then
+                            CurrentMaxDist = dist
+                            Target = v.Character
+                        end
+                    end
+                end
+
+                if Target then
+                    local targetHRP = Target.HumanoidRootPart
+                    ExpandHitbox(Target)
+                    tool:Activate()
+                    tool.Handle.CFrame = targetHRP.CFrame * CFrame.new(0, 0, -1) * CFrame.Angles(math.rad(90), 0, 0)
+                    
+                    if _G.AntiLag then task.wait(0.01) end
+                end
+            end
+        end)
+    end
+end)
+
+task.spawn(function()
+    while task.wait(0.5) do
+        if _G.AntiVoid and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            if LocalPlayer.Character.HumanoidRootPart.Position.Y < -15 then
+                local spawnPos = workspace:FindFirstChildOfClass("SpawnLocation")
+                if spawnPos then
+                    LocalPlayer.Character.HumanoidRootPart.CFrame = spawnPos.CFrame + Vector3.new(0, 10, 0)
+                end
+            end
+        end
+    end
+end)
+
+local Remotes = ReplicatedStorage:FindFirstChild("Remotes")
+
+-- Grass Incremental Functions Core
+local function AutoGrassNormal(state)
+    task.spawn(function()
+        while state and GrassSimulatorSettings.AutoGrassNormalEnabled do
+            if Remotes and Remotes:FindFirstChild("GrassCollect") then
+                pcall(function()
+                    Remotes.GrassCollect:FireServer({["normal"] = 1, ["diamond"] = 0, ["silver"] = 0, ["ruby"] = 0, ["golden"] = 0})
+                end)
+            end
+            task.wait()
+            if not GrassSimulatorSettings.AutoGrassNormalEnabled then break end
+        end
+    end)
+end
+
+local function AutoGrassDiamond(state)
+    task.spawn(function()
+        while state and GrassSimulatorSettings.AutoGrassDiamondEnabled do
+            if Remotes and Remotes:FindFirstChild("GrassCollect") then
+                pcall(function()
+                    Remotes.GrassCollect:FireServer({["normal"] = 0, ["diamond"] = 1, ["silver"] = 0, ["ruby"] = 0, ["golden"] = 0})
+                end)
+            end
+            task.wait()
+            if not GrassSimulatorSettings.AutoGrassDiamondEnabled then break end
+        end
+    end)
+end
+
+local function AutoUpgrade(state)
+    task.spawn(function()
+        while state and GrassSimulatorSettings.AutoUpgradeEnabled do
+            if Remotes and Remotes:FindFirstChild("Upgrade") then
+                pcall(function()
+                    Remotes.Upgrade:FireServer({{["currencyName"] = "Grass", ["autoBuy"] = false, ["amount"] = 35, ["max"] = 99, ["cost"] = 650782, ["upgradeValue"] = "GrassValue"}})
+                end)
+            end
+            task.wait(1)
+            if not GrassSimulatorSettings.AutoUpgradeEnabled then break end
+        end
+    end)
+end
+
+local function AutoRebirth(state)
+    task.spawn(function()
+        while state and GrassSimulatorSettings.AutoRebirthEnabled do
+            if Remotes and Remotes:FindFirstChild("Rebirth") then
+                pcall(function()
+                    Remotes.Rebirth:FireServer()
+                end)
+            end
+            task.wait(2)
+            if not GrassSimulatorSettings.AutoRebirthEnabled then break end
+        end
+    end)
+end
+
+local function GrassWalkSpeed(state)
+    task.spawn(function()
+        while state and GrassSimulatorSettings.WalkSpeedEnabled do
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+                LocalPlayer.Character.Humanoid.WalkSpeed = 50
+            end
+            task.wait(0.1)
+            if not GrassSimulatorSettings.WalkSpeedEnabled then break end
+        end
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+            LocalPlayer.Character.Humanoid.WalkSpeed = 16
+        end
+    end)
+end
+
 -- TSB Settings Configuration (Dash-Triggered Zigzag & Lock Logic)
 local TSBSettings = {
     TargetAnimId = "10503381238",
@@ -1047,7 +1345,10 @@ end
 local MainNavPage = CreatePage("Main")
 local BloxSpinPage = CreatePage("BloxSpin")
 local StealEggPage = CreatePage("Steal An Egg")
+local GrassSimulatorPage = CreatePage("Grass Simulator")
 local TSBPage = CreatePage("TSB")
+local KillstreakGlovesPage = CreatePage("Killstreak gloves Button Test")
+local GunGroundsPage = CreatePage("[FPS] Gun Grounds FFA")
 local SettingsPage = CreatePage("Settings")
 
 local currentTab = nil
@@ -1078,18 +1379,18 @@ local function SwitchTab(tabName)
     end
 end
 
-local tabNames = {"Main", "BloxSpin", "Steal An Egg", "TSB", "Settings"}
+local tabNames = {"Main", "BloxSpin", "Steal An Egg", "Grass Simulator", "TSB", "Killstreak gloves Button Test", "[FPS] Gun Grounds FFA", "Settings"}
 for i, name in ipairs(tabNames) do
     local Btn = Instance.new("TextButton")
-    Btn.Size = UDim2.new(1, -16, 0, 24)
-    Btn.Position = UDim2.new(0, 8, 0, 80 + ((i-1) * 28))
+    Btn.Size = UDim2.new(1, -16, 0, 20)
+    Btn.Position = UDim2.new(0, 8, 0, 75 + ((i-1) * 22))
     Btn.BackgroundColor3 = Color3.fromRGB(16, 16, 16)
     Btn.BorderColor3 = Color3.fromRGB(25, 25, 25)
     Btn.Text = "  " .. name
     Btn.TextColor3 = Color3.fromRGB(140, 140, 140)
     Btn.TextXAlignment = Enum.TextXAlignment.Left
     Btn.FontFace = MCFont
-    Btn.TextSize = 9
+    Btn.TextSize = 6
     Btn.Parent = SideBar
 
     local Indicator = Instance.new("ImageLabel")
@@ -1329,6 +1630,17 @@ local function AddButton(parent, yPos, text, callback)
     end)
 end
 
+-- ==================== GUN GROUNDS FFA PAGE ====================
+local GunGroundsSec = CreateSection(GunGroundsPage, "[FPS] Gun Grounds FFA Core", UDim2.new(0, 333, 0, 320), UDim2.new(0, 5, 0, 10))
+AddToggle(GunGroundsSec, 26, "Auto Classic Camera", _G.AutoCam, function(val) _G.AutoCam = val end)
+AddToggle(GunGroundsSec, 46, "Silent Aim / Lock", _G.Silent, function(val) _G.Silent = val end)
+AddToggle(GunGroundsSec, 66, "Sky Hunter Mode", _G.SkyHunter, function(val) _G.SkyHunter = val end)
+AddToggle(GunGroundsSec, 86, "Spin Bot", _G.Spin, function(val) _G.Spin = val end)
+AddSlider(GunGroundsSec, 104, "Spin Speed", 10, 360, 45, function(val) _G.SpinSpeed = val end)
+AddToggle(GunGroundsSec, 136, "Zig Zag", _G.ZigZag, function(val) _G.ZigZag = val end)
+AddToggle(GunGroundsSec, 156, "Speed Hack", _G.SpeedHack, function(val) _G.SpeedHack = val end)
+AddSlider(GunGroundsSec, 174, "WalkSpeed Value", 16, 200, 50, function(val) _G.CustomWalkSpeed = val end)
+
 -- ==================== MAIN PAGE (FORMERLY PLAYER) ====================
 local SpeedSec = CreateSection(MainNavPage, "Movement & NoClip", UDim2.new(0, 165, 0, 320), UDim2.new(0, 5, 0, 10))
 AddToggle(SpeedSec, 24, "Enable Speed", AdvancedMovementEngine.SpeedEnabled, function(val) AdvancedMovementEngine.SpeedEnabled = val end)
@@ -1489,6 +1801,29 @@ AddButton(StealEggSec, 115, "Re-Spawn Character (Humanoid Reset)", function()
     ReSpawnCharacter(StealEggSettings.WarpSpeed)
 end)
 
+-- ==================== GRASS SIMULATOR PAGE ====================
+local GrassSec = CreateSection(GrassSimulatorPage, "Grass Incremental Simulator", UDim2.new(0, 333, 0, 260), UDim2.new(0, 5, 0, 10))
+AddToggle(GrassSec, 26, "Auto Grass (Normal)", GrassSimulatorSettings.AutoGrassNormalEnabled, function(val)
+    GrassSimulatorSettings.AutoGrassNormalEnabled = val
+    if val then AutoGrassNormal(val) end
+end)
+AddToggle(GrassSec, 52, "Auto Grass (Diamond)", GrassSimulatorSettings.AutoGrassDiamondEnabled, function(val)
+    GrassSimulatorSettings.AutoGrassDiamondEnabled = val
+    if val then AutoGrassDiamond(val) end
+end)
+AddToggle(GrassSec, 78, "Auto Upgrade (GrassValue)", GrassSimulatorSettings.AutoUpgradeEnabled, function(val)
+    GrassSimulatorSettings.AutoUpgradeEnabled = val
+    if val then AutoUpgrade(val) end
+end)
+AddToggle(GrassSec, 104, "Auto Rebirth", GrassSimulatorSettings.AutoRebirthEnabled, function(val)
+    GrassSimulatorSettings.AutoRebirthEnabled = val
+    if val then AutoRebirth(val) end
+end)
+AddToggle(GrassSec, 130, "WalkSpeed Boost (50)", GrassSimulatorSettings.WalkSpeedEnabled, function(val)
+    GrassSimulatorSettings.WalkSpeedEnabled = val
+    if val then GrassWalkSpeed(val) end
+end)
+
 -- ==================== TSB PAGE ====================
 local TSBMainSec = CreateSection(TSBPage, "TSB Combat & Lock Logic", UDim2.new(0, 333, 0, 320), UDim2.new(0, 5, 0, 10))
 AddToggle(TSBMainSec, 24, "Zigzag Lock", TSBSettings.ZigzagEnabled, function(val) TSBSettings.ZigzagEnabled = val end)
@@ -1505,6 +1840,18 @@ AddDropdown(TSBMainSec, 150, {"All Targets", "Players Only", "NPCs / Dummies"}, 
 end)
 
 AddSlider(TSBMainSec, 185, "Lock Duration", 0.1, 3.0, TSBSettings.LockDuration, function(val) TSBSettings.LockDuration = val end)
+
+-- ==================== KILLSTREAK GLOVES BUTTON TEST PAGE ====================
+local KillstreakSec = CreateSection(KillstreakGlovesPage, "God Mode V6 Controls", UDim2.new(0, 333, 0, 260), UDim2.new(0, 5, 0, 10))
+AddToggle(KillstreakSec, 26, "GOD CLICK UI", _G.AutoClick, function(val) _G.AutoClick = val end)
+AddToggle(KillstreakSec, 52, "GLOVE KILL AURA", _G.KillAura, function(val) _G.KillAura = val end)
+AddToggle(KillstreakSec, 78, "WARP GLOVE FARM", _G.AutoFarm, function(val) _G.AutoFarm = val end)
+AddToggle(KillstreakSec, 104, "ANTI-VOID", _G.AntiVoid, function(val) _G.AntiVoid = val end)
+AddToggle(KillstreakSec, 130, "NO ANIMATION", false, function(val) 
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Animate") then 
+        LocalPlayer.Character.Animate.Disabled = val 
+    end 
+end)
 
 -- ==================== SETTINGS PAGE ====================
 local GeneralUISec = CreateSection(SettingsPage, "Interface Display & Status", UDim2.new(0, 165, 0, 260), UDim2.new(0, 5, 0, 10))
